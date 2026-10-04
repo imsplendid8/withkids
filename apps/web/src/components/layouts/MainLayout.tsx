@@ -47,6 +47,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     { href: '/dashboard', label: '대시보드' },
     { href: '/experiences', label: '프로그램 둘러보기' },
     { href: '/festivals', label: '축제' },
+    { href: '/notices', label: '기관 공지' },
     { href: '/bookings', label: '예약 관리' },
     { href: '/profile', label: '프로필' },
   ];

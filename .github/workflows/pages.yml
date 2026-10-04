@@ -53,6 +53,11 @@ jobs:
           TOUR_API_KEY: ${{ secrets.TOUR_API_KEY }}
           TZ: Asia/Seoul
 
+      # 박물관·과학관 공지사항 (도슨트·교육 모집 등)
+      - name: Collect museum notices
+        run: npm run export:notices --workspace=apps/api -- ../web/public/data/notices.json
+        continue-on-error: true
+
       - name: Build static site
         run: npm run build --workspace=apps/web
         env:

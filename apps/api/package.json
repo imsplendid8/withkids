@@ -19,7 +19,8 @@
     "db:seed": "node dist/database/seed.js",
     "crawler:verify": "ts-node --project tsconfig.json scripts/verify-seoul-api.ts",
     "export:programs": "ts-node --project tsconfig.json scripts/export-programs.ts",
-    "export:festivals": "ts-node --project tsconfig.json scripts/export-festivals.ts"
+    "export:festivals": "ts-node --project tsconfig.json scripts/export-festivals.ts",
+    "export:notices": "ts-node --project tsconfig.json scripts/export-notices.ts"
   },
   "dependencies": {
     "@bull-board/express": "^9.10.0",
