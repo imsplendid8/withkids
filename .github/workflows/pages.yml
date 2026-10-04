@@ -59,6 +59,8 @@ jobs:
           NEXT_PUBLIC_STATIC_MODE: 'true'
           NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
           NEXT_PUBLIC_CRAWL_WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/workflows/pages.yml
+          # 구글 로그인: Firebase 웹 앱 설정(firebaseConfig)을 저장소 Secret FIREBASE_CONFIG에 넣으면 켜진다
+          NEXT_PUBLIC_FIREBASE_CONFIG: ${{ secrets.FIREBASE_CONFIG }}
 
       # GitHub Pages가 _next 폴더를 무시하지 않도록
       - run: touch apps/web/out/.nojekyll

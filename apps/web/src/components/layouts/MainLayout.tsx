@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { useAuthStore } from '@/store/authStore';
 import { apiClient } from '@/lib/api';
 import { STATIC_MODE } from '@/lib/staticMode';
+import { CLOUD_ENABLED, signOutCloud } from '@/lib/cloud';
 import { FiMenu, FiX, FiBell, FiLogOut } from 'react-icons/fi';
 
 interface MainLayoutProps {
@@ -33,7 +34,11 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
     };
   }, [isAuthenticated, router.asPath]);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    if (CLOUD_ENABLED) {
+      // 계정에 마저 저장하고, 이 브라우저에서 계정 데이터를 지운다
+      await signOutCloud().catch((error) => console.error('로그아웃 실패:', error));
+    }
     logout();
     router.push('/login');
   };
@@ -102,7 +107,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               </button>
 
               {/* Logout button (로그인이 없는 정적 배포에서는 숨긴다) */}
-              {!STATIC_MODE && (
+              {(!STATIC_MODE || CLOUD_ENABLED) && (
                 <button
                   onClick={handleLogout}
                   className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors duration-200"
@@ -138,9 +143,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {children}
-      </main>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">{children}</main>
 
       {/* Footer */}
       <footer className="bg-slate-900 border-t border-slate-800 mt-16">
