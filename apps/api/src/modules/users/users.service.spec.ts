@@ -57,6 +57,66 @@ describe('UsersService', () => {
     service = module.get<UsersService>(UsersService);
   });
 
+  describe('createUserWithPassword', () => {
+    const transactionWith = (repos: { users: any; preferences: any }) =>
+      jest.fn(async (work: (manager: any) => Promise<unknown>) =>
+        work({
+          getRepository: (entity: unknown) => (entity === User ? repos.users : repos.preferences),
+        })
+      );
+
+    it('사용자·기본 설정·비밀번호를 한 트랜잭션에서 저장한다', async () => {
+      const users = {
+        findOne: jest.fn().mockResolvedValue(null),
+        create: jest.fn((v) => v),
+        save: jest.fn(async (v) => ({ ...v, id: 'user-1' })),
+      };
+      const preferences = { create: jest.fn((v) => v), save: jest.fn().mockResolvedValue({}) };
+      mockUserRepository.manager = { transaction: transactionWith({ users, preferences }) };
+
+      const user = await service.createUserWithPassword('me@example.com', 'hash', '나');
+
+      expect(user).toMatchObject({ id: 'user-1', email: 'me@example.com', passwordHash: 'hash' });
+      expect(preferences.save).toHaveBeenCalledWith({ userId: 'user-1' });
+      expect(mockUserRepository.manager.transaction).toHaveBeenCalledTimes(1);
+    });
+
+    it('기본 설정 저장이 실패하면 트랜잭션 오류를 그대로 던진다 (커밋되지 않음)', async () => {
+      const users = {
+        findOne: jest.fn().mockResolvedValue(null),
+        create: jest.fn((v) => v),
+        save: jest.fn(async (v) => ({ ...v, id: 'user-1' })),
+      };
+      const preferences = {
+        create: jest.fn((v) => v),
+        save: jest.fn().mockRejectedValue(new Error('db down')),
+      };
+      mockUserRepository.manager = { transaction: transactionWith({ users, preferences }) };
+
+      await expect(service.createUserWithPassword('me@example.com', 'hash')).rejects.toThrow(
+        'db down'
+      );
+    });
+
+    it('이미 있는 이메일이면 막는다', async () => {
+      const users = {
+        findOne: jest.fn().mockResolvedValue({ id: 'x' }),
+        create: jest.fn(),
+        save: jest.fn(),
+      };
+      mockUserRepository.manager = {
+        transaction: transactionWith({
+          users,
+          preferences: { create: jest.fn(), save: jest.fn() },
+        }),
+      };
+      await expect(service.createUserWithPassword('me@example.com', 'hash')).rejects.toThrow(
+        'Email already registered'
+      );
+      expect(users.save).not.toHaveBeenCalled();
+    });
+  });
+
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
@@ -88,7 +148,7 @@ describe('UsersService', () => {
       const result = await service.createUser(
         userData.email,
         userData.profileName,
-        userData.childrenAges,
+        userData.childrenAges
       );
 
       expect(result.email).toBe(userData.email);
@@ -134,11 +194,7 @@ describe('UsersService', () => {
         ...bookmarkData,
       });
 
-      const result = await service.addBookmark(
-        'user-1',
-        'run-1',
-        BookmarkType.WISHLIST,
-      );
+      const result = await service.addBookmark('user-1', 'run-1', BookmarkType.WISHLIST);
 
       expect(result.bookmarkType).toBe(BookmarkType.WISHLIST);
       expect(mockBookmarksRepository.save).toHaveBeenCalled();
@@ -157,11 +213,7 @@ describe('UsersService', () => {
         bookmarkType: BookmarkType.INTERESTED,
       });
 
-      const result = await service.addBookmark(
-        'user-1',
-        'run-1',
-        BookmarkType.INTERESTED,
-      );
+      const result = await service.addBookmark('user-1', 'run-1', BookmarkType.INTERESTED);
 
       expect(result.bookmarkType).toBe(BookmarkType.INTERESTED);
     });
@@ -205,7 +257,12 @@ describe('UsersService', () => {
         profileImageUrl: 'https://example.com/image.jpg',
       });
 
-      const result = await service.updateUserProfile('user-1', 'New Name', [5, 8], 'https://example.com/image.jpg');
+      const result = await service.updateUserProfile(
+        'user-1',
+        'New Name',
+        [5, 8],
+        'https://example.com/image.jpg'
+      );
 
       expect(result.profileName).toBe('New Name');
       expect(result.childrenAges).toEqual([5, 8]);
@@ -248,7 +305,9 @@ describe('UsersService', () => {
       const result = await service.updateUserPreferences('user-1', updates);
 
       expect(mockPreferencesRepository.update).toHaveBeenCalledWith({ userId: 'user-1' }, updates);
-      expect(mockPreferencesRepository.findOne).toHaveBeenCalledWith({ where: { userId: 'user-1' } });
+      expect(mockPreferencesRepository.findOne).toHaveBeenCalledWith({
+        where: { userId: 'user-1' },
+      });
       expect(result.interestedCategories).toEqual(['sports', 'art']);
       expect(result.maxPricePerProgram).toBe(75000);
     });
@@ -258,7 +317,7 @@ describe('UsersService', () => {
       mockPreferencesRepository.findOne.mockResolvedValue(null);
 
       await expect(
-        service.updateUserPreferences('user-1', { maxPricePerProgram: 1000 } as any),
+        service.updateUserPreferences('user-1', { maxPricePerProgram: 1000 } as any)
       ).rejects.toThrow('Preferences not found');
     });
   });
@@ -290,8 +349,18 @@ describe('UsersService', () => {
 
     it('should retrieve user bookmarks without filter', async () => {
       const mockBookmarks: any = [
-        { id: 'bookmark-1', userId: 'user-1', experienceRunId: 'run-1', bookmarkType: BookmarkType.WISHLIST },
-        { id: 'bookmark-2', userId: 'user-1', experienceRunId: 'run-2', bookmarkType: BookmarkType.INTERESTED },
+        {
+          id: 'bookmark-1',
+          userId: 'user-1',
+          experienceRunId: 'run-1',
+          bookmarkType: BookmarkType.WISHLIST,
+        },
+        {
+          id: 'bookmark-2',
+          userId: 'user-1',
+          experienceRunId: 'run-2',
+          bookmarkType: BookmarkType.INTERESTED,
+        },
       ];
       const qb = mockQueryBuilder(mockBookmarks);
 
@@ -306,7 +375,12 @@ describe('UsersService', () => {
 
     it('should retrieve user bookmarks with type filter', async () => {
       const mockBookmarks: any = [
-        { id: 'bookmark-1', userId: 'user-1', experienceRunId: 'run-1', bookmarkType: BookmarkType.WISHLIST },
+        {
+          id: 'bookmark-1',
+          userId: 'user-1',
+          experienceRunId: 'run-1',
+          bookmarkType: BookmarkType.WISHLIST,
+        },
       ];
       const qb = mockQueryBuilder(mockBookmarks);
 

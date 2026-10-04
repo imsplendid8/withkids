@@ -13,14 +13,10 @@ export class UsersService {
     @InjectRepository(UserPreferences)
     private preferencesRepository: Repository<UserPreferences>,
     @InjectRepository(UserBookmark)
-    private bookmarksRepository: Repository<UserBookmark>,
+    private bookmarksRepository: Repository<UserBookmark>
   ) {}
 
-  async createUser(
-    email: string,
-    profileName?: string,
-    childrenAges?: number[],
-  ): Promise<User> {
+  async createUser(email: string, profileName?: string, childrenAges?: number[]): Promise<User> {
     const existingUser = await this.usersRepository.findOne({
       where: { email },
     });
@@ -47,6 +43,29 @@ export class UsersService {
     return savedUser;
   }
 
+  /**
+   * 비밀번호까지 포함한 계정을 한 번에 만든다 (사용자·기본 설정·비밀번호를 한 트랜잭션으로).
+   * 중간에 실패하면 아무것도 남지 않아, 첫 계정 만들기를 다시 시도할 수 있다.
+   */
+  async createUserWithPassword(
+    email: string,
+    passwordHash: string,
+    profileName?: string
+  ): Promise<User> {
+    return this.usersRepository.manager.transaction(async (manager) => {
+      const users = manager.getRepository(User);
+      if (await users.findOne({ where: { email } })) {
+        throw new ConflictException('Email already registered');
+      }
+      const saved = await users.save(
+        users.create({ email, profileName, passwordHash, isActive: true })
+      );
+      const preferences = manager.getRepository(UserPreferences);
+      await preferences.save(preferences.create({ userId: saved.id }));
+      return saved;
+    });
+  }
+
   async getUserById(userId: string): Promise<User | null> {
     return this.usersRepository.findOne({
       where: { id: userId },
@@ -65,7 +84,7 @@ export class UsersService {
     userId: string,
     profileName?: string,
     childrenAges?: number[],
-    profileImageUrl?: string,
+    profileImageUrl?: string
   ): Promise<User> {
     const user = await this.usersRepository.findOne({ where: { id: userId } });
 
@@ -88,7 +107,7 @@ export class UsersService {
 
   async updateUserPreferences(
     userId: string,
-    updates: Partial<UserPreferences>,
+    updates: Partial<UserPreferences>
   ): Promise<UserPreferences> {
     await this.preferencesRepository.update({ userId }, updates);
 
@@ -106,7 +125,7 @@ export class UsersService {
   async addBookmark(
     userId: string,
     experienceRunId: string,
-    bookmarkType: BookmarkType = BookmarkType.WISHLIST,
+    bookmarkType: BookmarkType = BookmarkType.WISHLIST
   ): Promise<UserBookmark> {
     const existingBookmark = await this.bookmarksRepository.findOne({
       where: { userId, experienceRunId },
@@ -130,10 +149,7 @@ export class UsersService {
     await this.bookmarksRepository.delete({ userId, experienceRunId });
   }
 
-  async getUserBookmarks(
-    userId: string,
-    bookmarkType?: BookmarkType,
-  ): Promise<UserBookmark[]> {
+  async getUserBookmarks(userId: string, bookmarkType?: BookmarkType): Promise<UserBookmark[]> {
     const query = this.bookmarksRepository
       .createQueryBuilder('b')
       .where('b.userId = :userId', { userId })

@@ -21,6 +21,8 @@ export interface AuthState {
   refreshToken: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  /** 구글 로그인 후 계정 데이터를 못 가져왔을 때 로그인 화면에 보여줄 안내 */
+  cloudError: string | null;
   login: (user: User, accessToken: string, refreshToken: string) => void;
   logout: () => void;
   setUser: (user: User) => void;
@@ -34,6 +36,7 @@ export const useAuthStore = create<AuthState>((set, _get) => ({
   refreshToken: null,
   isLoading: true,
   isAuthenticated: false,
+  cloudError: null,
 
   login: (user, accessToken, refreshToken) => {
     localStorage.setItem('accessToken', accessToken);
@@ -75,23 +78,27 @@ export const useAuthStore = create<AuthState>((set, _get) => ({
       // 서버 없는 배포 + 구글 로그인: 로그인하면 계정 데이터를 가져온 뒤 들어간다
       if (watchingCloud) return;
       watchingCloud = true;
-      watchCloudUser((cloudUser) => {
-        if (!cloudUser) {
-          set({ user: null, isAuthenticated: false, isLoading: false });
-          return;
-        }
-        const profile = getLocalProfile();
-        set({
-          user: {
-            ...profile,
-            id: cloudUser.uid,
-            email: cloudUser.email,
-            profileName: profile.profileName || cloudUser.displayName,
-          },
-          isAuthenticated: true,
-          isLoading: false,
-        });
-      }).catch((error) => {
+      watchCloudUser(
+        (cloudUser) => {
+          if (!cloudUser) {
+            set({ user: null, isAuthenticated: false, isLoading: false });
+            return;
+          }
+          const profile = getLocalProfile();
+          set({
+            cloudError: null,
+            user: {
+              ...profile,
+              id: cloudUser.uid,
+              email: cloudUser.email,
+              profileName: profile.profileName || cloudUser.displayName,
+            },
+            isAuthenticated: true,
+            isLoading: false,
+          });
+        },
+        (message) => set({ cloudError: message, isAuthenticated: false, isLoading: false })
+      ).catch((error) => {
         console.error('로그인 기능을 불러오지 못했습니다:', error);
         set({ isLoading: false });
       });

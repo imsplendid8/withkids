@@ -146,7 +146,6 @@ async function pullOrSeed(uid: string): Promise<void> {
   const remote = snapshot.exists()
     ? (snapshot.data().store as Record<string, string> | undefined)
     : undefined;
-  currentUid = uid;
   if (remote) {
     suppressHook = true;
     try {
@@ -154,16 +153,31 @@ async function pullOrSeed(uid: string): Promise<void> {
     } finally {
       suppressHook = false;
     }
+    currentUid = uid;
   } else {
     // 처음 로그인: 지금 이 브라우저에 있던 데이터를 계정으로 옮긴다
-    await pushNow();
+    currentUid = uid;
+    try {
+      await pushNow();
+    } catch (error) {
+      currentUid = null;
+      throw error;
+    }
   }
 }
 
+export const PULL_FAILED_MESSAGE =
+  '계정 데이터를 불러오지 못했어요. 인터넷 연결을 확인하고 다시 로그인해 주세요.';
+
 /**
  * 로그인 상태를 지켜본다. 로그인돼 있으면 계정 데이터를 가져온 뒤 onChange(user)를 부른다.
+ * 계정 데이터를 못 가져오면 로그인 상태로 들어가지 않는다: 이 브라우저의 (오래됐거나 빈) 데이터로
+ * 계정의 데이터를 덮어쓰지 않도록 계정 저장을 끈 채 로그아웃하고 onError로 알린다.
  */
-export async function watchCloudUser(onChange: (user: CloudUser | null) => void): Promise<void> {
+export async function watchCloudUser(
+  onChange: (user: CloudUser | null) => void,
+  onError: (message: string) => void = () => undefined
+): Promise<void> {
   const { auth } = await connect();
   const { onAuthStateChanged, getRedirectResult } = await import('firebase/auth');
   installWriteHook();
@@ -179,7 +193,11 @@ export async function watchCloudUser(onChange: (user: CloudUser | null) => void)
       await pullOrSeed(user.uid);
     } catch (error) {
       console.error('계정 데이터를 가져오지 못했습니다:', error);
-      currentUid = user.uid;
+      currentUid = null;
+      onError(PULL_FAILED_MESSAGE);
+      const { signOut } = await import('firebase/auth');
+      await signOut(auth).catch(() => undefined);
+      return;
     }
     onChange({ uid: user.uid, email: user.email ?? '', displayName: user.displayName ?? '' });
   });
@@ -204,11 +222,24 @@ export async function signInWithGoogle(): Promise<void> {
   }
 }
 
+export const UNSAVED_CHANGES_MESSAGE =
+  '아직 계정에 저장하지 못한 변경이 있어 로그아웃하지 않았어요. 인터넷 연결을 확인하고 다시 눌러 주세요.';
+
+/**
+ * 계정에 마저 저장한 뒤 로그아웃하고 이 브라우저에서 계정 데이터를 지운다.
+ * 마지막 저장이 실패하면 아무것도 지우지 않고 오류를 던진다 (다시 시도할 수 있게).
+ */
 export async function signOutCloud(): Promise<void> {
   if (pushTimer) {
     clearTimeout(pushTimer);
     pushTimer = null;
-    await pushNow().catch(() => undefined);
+    try {
+      await pushNow();
+    } catch (error) {
+      console.error('로그아웃 전 저장 실패:', error);
+      schedulePush();
+      throw new Error(UNSAVED_CHANGES_MESSAGE);
+    }
   }
   const { auth } = await connect();
   const { signOut } = await import('firebase/auth');

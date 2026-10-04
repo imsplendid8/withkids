@@ -12,6 +12,9 @@ FROM base AS builder
 COPY package*.json ./
 COPY --from=deps /app/node_modules ./node_modules
 COPY apps/web/ ./apps/web/
+# next.config.js의 /api 프록시(rewrites)는 빌드할 때 주소가 굳는다. 실행 때 환경변수로는 안 바뀐다.
+ARG API_PROXY_TARGET=http://api:3001
+ENV API_PROXY_TARGET=$API_PROXY_TARGET
 RUN npm run build --workspace=apps/web
 
 # 런타임 (standalone 출력물만 실행)

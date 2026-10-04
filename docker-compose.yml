@@ -92,13 +92,15 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      args:
+        # 브라우저가 호출한 /api 를 이 주소로 넘긴다 (컨테이너 내부 통신).
+        # Next.js가 빌드할 때 굳히므로 실행 환경변수가 아니라 빌드 인자로 넘긴다.
+        API_PROXY_TARGET: http://api:3001
     container_name: withdkis-web
     restart: unless-stopped
     environment:
       NODE_ENV: production
       PORT: 3000
-      # 브라우저가 호출한 /api 를 이 주소로 넘긴다 (컨테이너 내부 통신)
-      API_PROXY_TARGET: http://api:3001
     ports:
       - '127.0.0.1:3000:3000'
     depends_on:

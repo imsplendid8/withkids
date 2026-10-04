@@ -20,21 +20,20 @@ export interface AuthToken {
 export class AuthService {
   constructor(
     private usersService: UsersService,
-    private jwtService: JwtService,
+    private jwtService: JwtService
   ) {}
 
   async register(
     email: string,
     password: string,
-    profileName?: string,
+    profileName?: string
   ): Promise<{ userId: string; email: string; accessToken: string }> {
     if (!(await this.isRegistrationOpen())) {
       throw new ForbiddenException('이미 계정이 있습니다. 로그인해 주세요.');
     }
     const passwordHash = await this.hashPassword(password);
-    const user = await this.usersService.createUser(email, profileName, undefined);
-
-    await this.usersService.updateUserPassword(user.id, passwordHash);
+    // 사용자·설정·비밀번호를 한 번에: 중간에 실패해 비밀번호 없는 계정만 남으면 다시 가입할 수 없다
+    const user = await this.usersService.createUserWithPassword(email, passwordHash, profileName);
 
     const tokens = this.generateTokens(user.id, email);
     return {
@@ -128,7 +127,7 @@ export class AuthService {
       {
         secret: process.env.JWT_SECRET,
         expiresIn: '1h',
-      },
+      }
     );
 
     return resetToken;

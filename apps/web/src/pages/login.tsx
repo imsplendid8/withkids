@@ -7,7 +7,7 @@ import { CLOUD_ENABLED, signInWithGoogle } from '@/lib/cloud';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isAuthenticated, isLoading: isAuthLoading } = useAuthStore();
+  const { login, isAuthenticated, isLoading: isAuthLoading, cloudError } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -58,9 +58,9 @@ export default function LoginPage() {
             <h1 className="text-3xl font-bold text-blue-600">WITHKIDS</h1>
             <p className="text-gray-600 mt-2">아이와 갈 체험·축제를 한곳에서</p>
           </div>
-          {error && (
+          {(error || cloudError) && (
             <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
-              {error}
+              {error || cloudError}
             </div>
           )}
           <button

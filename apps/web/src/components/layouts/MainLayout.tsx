@@ -36,8 +36,13 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
   const handleLogout = async () => {
     if (CLOUD_ENABLED) {
-      // 계정에 마저 저장하고, 이 브라우저에서 계정 데이터를 지운다
-      await signOutCloud().catch((error) => console.error('로그아웃 실패:', error));
+      // 계정에 마저 저장하고, 이 브라우저에서 계정 데이터를 지운다. 저장이 실패하면 로그아웃하지 않는다.
+      try {
+        await signOutCloud();
+      } catch (error) {
+        window.alert((error as Error).message);
+        return;
+      }
     }
     logout();
     router.push('/login');
