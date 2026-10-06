@@ -58,6 +58,15 @@ jobs:
         run: npm run export:notices --workspace=apps/api -- ../web/public/data/notices.json
         continue-on-error: true
 
+      # 유료 체험: 놀이의발견(하루 최대 500개씩 천천히, 지난 결과는 배포된 사이트에서 이어받음) + 구석구석
+      - name: Collect paid experiences
+        run: npm run export:paid --workspace=apps/api -- ../web/public/data
+        continue-on-error: true
+        env:
+          TOUR_API_KEY: ${{ secrets.TOUR_API_KEY }}
+          PAID_CACHE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/data/paid-cache.json
+          TZ: Asia/Seoul
+
       - name: Build static site
         run: npm run build --workspace=apps/web
         env:
