@@ -129,9 +129,9 @@ export class JobsService implements OnModuleInit {
     return {
       queue: 'crawler',
       counts,
-      repeatableJobs: repeatableJobs.map((job: any) => ({
+      repeatableJobs: repeatableJobs.map((job) => ({
         name: job.name,
-        cron: job.cron || (job.opts?.repeat?.cron as string),
+        cron: job.cron,
       })),
       recentFailed: failed,
       recentCompleted: completed,
@@ -148,9 +148,9 @@ export class JobsService implements OnModuleInit {
     return {
       queue: 'notification-delivery',
       counts,
-      repeatableJobs: repeatableJobs.map((job: any) => ({
+      repeatableJobs: repeatableJobs.map((job) => ({
         name: job.name,
-        cron: job.cron || (job.opts?.repeat?.cron as string),
+        cron: job.cron,
       })),
       recentFailed: failed,
       recentCompleted: completed,

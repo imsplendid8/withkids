@@ -18,7 +18,9 @@
     "@typescript-eslint/no-unused-vars": [
       "error",
       {
-        "argsIgnorePattern": "^_"
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_",
+        "ignoreRestSiblings": true
       }
     ],
     "@typescript-eslint/explicit-module-boundary-types": "off",
@@ -28,5 +30,14 @@
         "allow": ["warn", "error"]
       }
     ]
-  }
+  },
+  "overrides": [
+    {
+      "files": ["**/*.spec.ts", "**/*.e2e-spec.ts", "**/__tests__/**", "**/*.test.ts", "**/*.test.tsx"],
+      "env": { "jest": true },
+      "rules": {
+        "@typescript-eslint/no-explicit-any": "off"
+      }
+    }
+  ]
 }

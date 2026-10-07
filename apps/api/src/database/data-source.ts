@@ -8,8 +8,16 @@ export const dataSource = new DataSource({
   url: process.env.DATABASE_URL || 'postgresql://postgres:password@localhost:5432/withdkis_dev',
   synchronize: process.env.NODE_ENV !== 'production',
   logging: process.env.NODE_ENV === 'development',
-  entities: ['src/**/*.entity.ts'],
-  migrations: ['src/database/migrations/*.ts'],
+  entities: [
+    process.env.NODE_ENV === 'production'
+      ? 'dist/**/*.entity.js'
+      : 'src/**/*.entity.ts',
+  ],
+  migrations: [
+    process.env.NODE_ENV === 'production'
+      ? 'dist/database/migrations/*.js'
+      : 'src/database/migrations/*.ts',
+  ],
   subscribers: [],
 });
 

@@ -11,12 +11,14 @@
     "dev": "concurrently \"npm run dev --workspace=apps/api\" \"npm run dev --workspace=apps/web\"",
     "dev:api": "npm run dev --workspace=apps/api",
     "dev:web": "npm run dev --workspace=apps/web",
-    "build": "npm run build --workspaces",
+    "build": "npm run build --workspaces --if-present",
     "build:api": "npm run build --workspace=apps/api",
     "build:web": "npm run build --workspace=apps/web",
-    "test": "npm run test --workspaces",
-    "lint": "npm run lint --workspaces",
-    "lint:fix": "npm run lint:fix --workspaces",
+    "test": "npm run test --workspaces --if-present",
+    "test:e2e": "npm run test:e2e --workspace=apps/api",
+    "type-check": "npm run type-check --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "lint:fix": "npm run lint:fix --workspaces --if-present",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\" --ignore-path .gitignore",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\" --ignore-path .gitignore",
     "db:migrate": "npm run db:migrate --workspace=apps/api",
@@ -24,6 +26,7 @@
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
+    "playwright": "^1.63.0",
     "prettier": "^3.0.3",
     "typescript": "^5.2.2"
   },
@@ -45,7 +48,7 @@
   },
   "homepage": "https://github.com/imsplendid8/game-app#readme",
   "engines": {
-    "node": ">=18.0.0",
+    "node": ">=20.19.0",
     "npm": ">=9.0.0"
   },
   "dependencies": {

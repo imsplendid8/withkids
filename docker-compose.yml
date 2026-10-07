@@ -1,15 +1,15 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
     container_name: withdkis-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD를 .env에 설정하세요}
       POSTGRES_DB: withdkis_dev
+    # 외부에 열지 않는다. DB는 컨테이너 네트워크 안에서만 접근한다.
     ports:
-      - '5432:5432'
+      - '127.0.0.1:5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -21,24 +21,28 @@ services:
   redis:
     image: redis:7-alpine
     container_name: withdkis-redis
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_dev_password}
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD를 .env에 설정하세요}
     ports:
-      - '6379:6379'
+      - '127.0.0.1:6379:6379'
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ['CMD', 'redis-cli', '--raw', 'incr', 'ping']
+      test: ['CMD-SHELL', 'redis-cli -a "$$REDIS_PASSWORD" ping | grep -q PONG']
       interval: 10s
       timeout: 5s
       retries: 5
     environment:
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis_dev_password}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
 
+  # DB 확인용 웹 UI. 로컬에서만 접근 가능하고 터널로는 노출되지 않는다.
   adminer:
     image: adminer
     container_name: withdkis-adminer
+    restart: unless-stopped
+    profiles: ['tools']
     ports:
-      - '8080:8080'
+      - '127.0.0.1:8080:8080'
     depends_on:
       postgres:
         condition: service_healthy
@@ -50,39 +54,69 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
     container_name: withdkis-api
+    restart: unless-stopped
     environment:
-      NODE_ENV: ${NODE_ENV:-development}
-      DATABASE_URL: postgresql://postgres:password@postgres:5432/withdkis_dev
-      REDIS_URL: redis://:redis_dev_password@redis:6379
-      JWT_SECRET: ${JWT_SECRET:-dev_secret_key_do_not_use_in_production}
-      JWT_EXPIRATION: 24h
+      NODE_ENV: production
       PORT: 3001
+      # 서울 오픈API의 접수 시각은 시간대 표기가 없는 한국 시간이다.
+      # 컨테이너가 UTC면 9시간 어긋나게 저장·표시된다.
+      TZ: Asia/Seoul
+      # 마이그레이션(snake_case)이 엔티티와 맞지 않고 bookings/reviews 테이블도 없어서,
+      # 스키마는 엔티티 기준으로 동기화한다. 끄려면 .env에 DB_SYNCHRONIZE=false.
+      DB_SYNCHRONIZE: ${DB_SYNCHRONIZE:-true}
+      DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD}@postgres:5432/withdkis_dev
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET을 .env에 설정하세요}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-7d}
+      # 크롤러 (없으면 서울 어댑터는 건너뛴다)
+      SEOUL_OPENAPI_KEY: ${SEOUL_OPENAPI_KEY:-}
+      # 예약 알림 메일 (없으면 전송만 실패하고 앱은 정상 동작)
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+    # 브라우저는 web을 통해서만 API에 닿는다. 디버깅용으로만 로컬에 연다.
     ports:
-      - '3001:3001'
+      - '127.0.0.1:3001:3001'
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - ./apps/api/src:/app/apps/api/src
-    command: npm run dev --workspace=apps/api
 
   web:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+      args:
+        # 브라우저가 호출한 /api 를 이 주소로 넘긴다 (컨테이너 내부 통신).
+        # Next.js가 빌드할 때 굳히므로 실행 환경변수가 아니라 빌드 인자로 넘긴다.
+        API_PROXY_TARGET: http://api:3001
     container_name: withdkis-web
+    restart: unless-stopped
     environment:
-      NODE_ENV: ${NODE_ENV:-development}
-      NEXT_PUBLIC_API_URL: http://api:3001
+      NODE_ENV: production
+      PORT: 3000
     ports:
-      - '3000:3000'
+      - '127.0.0.1:3000:3000'
     depends_on:
       - api
-    volumes:
-      - ./apps/web/src:/app/apps/web/src
-    command: npm run dev --workspace=apps/web
+
+  # docker compose --profile tunnel up -d 로만 함께 뜬다.
+  # 프로필을 안 써도 변수 보간은 일어나므로 필수(:?)로 두면 로컬 실행까지 막힌다.
+  # 토큰이 비어 있으면 cloudflared가 알아서 실패한다.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: withdkis-tunnel
+    restart: unless-stopped
+    profiles: ['tunnel']
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:-}
+    depends_on:
+      - web
 
 volumes:
   postgres_data:

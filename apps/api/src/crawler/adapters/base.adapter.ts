@@ -64,7 +64,7 @@ export abstract class BaseAdapter {
     return !isNaN(date.getTime()) ? date : null;
   }
 
-  protected normalizePrice(price: any): number | null {
+  protected normalizePrice(price: unknown): number | null {
     if (price === null || price === undefined) return null;
     if (typeof price === 'string') {
       const parsed = parseInt(price.replace(/[^0-9]/g, ''));

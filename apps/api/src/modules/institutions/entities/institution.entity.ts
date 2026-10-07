@@ -5,8 +5,8 @@ export class Institution {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'varchar', length: 255, unique: true })
-  name: string;
+  @Column({ name: 'name', type: 'varchar', length: 255, unique: true })
+  institutionName: string;
 
   @Column({ type: 'text', nullable: true })
   description: string;
@@ -27,8 +27,8 @@ export class Institution {
   longitude: number;
 
   @Column({
-    type: 'enum',
-    enum: ['PUBLIC', 'MUSEUM', 'SCIENCE_CENTER', 'FACTORY', 'BROADCASTING', 'OTHER'],
+    type: 'varchar',
+    length: 50,
     default: 'OTHER',
   })
   institutionType: string;

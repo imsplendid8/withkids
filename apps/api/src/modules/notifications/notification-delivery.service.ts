@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Notification, NotificationType, NotificationPriority } from './entities/notification.entity';
+import { Notification, NotificationType } from './entities/notification.entity';
 import { NotificationsService } from './notifications.service';
 import { UsersService } from '../users/users.service';
 

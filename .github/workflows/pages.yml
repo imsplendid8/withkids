@@ -1,0 +1,96 @@
+name: GitHub Pages
+
+# https://imsplendid8.github.io/<저장소 이름> 에 정적 버전을 올린다.
+# 주소는 저장소 이름을 따라가므로 저장소 이름을 바꾸면 주소도 자동으로 바뀐다.
+# - 프로그램 정보: 빌드할 때 서울시 API 등에서 수집해 data/programs.json 으로 넣는다
+# - 예약·후기·찜: 방문한 브라우저에 저장된다 (서버 없음)
+on:
+  push:
+    branches:
+      - main
+      - claude/kids-experience-booking-tracker-pfuuqs
+  # 매일 오전 6시(한국 시간)에 다시 수집해서 배포. schedule은 기본 브랜치(main)에 있는 파일만 실행된다.
+  schedule:
+    - cron: '0 21 * * *'
+  # 저장소 Actions 화면의 "Run workflow" 버튼으로 바로 수집
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+
+      - run: npm ci
+
+      # 수집이 실패해도(키 없음, 사이트 장애) 빈 목록과 오류 내용을 담아 배포한다.
+      # 화면의 "데이터 수집" 패널에서 이유를 볼 수 있다.
+      - name: Collect programs
+        run: npm run export:programs --workspace=apps/api -- ../web/public/data/programs.json
+        env:
+          SEOUL_OPENAPI_KEY: ${{ secrets.SEOUL_OPENAPI_KEY }}
+          TZ: Asia/Seoul
+
+      # 서울·근교 축제 (서울 문화행사 + 한국관광공사). 키가 없거나 실패해도 배포는 계속한다.
+      - name: Collect festivals
+        run: npm run export:festivals --workspace=apps/api -- ../web/public/data/festivals.json
+        env:
+          SEOUL_OPENAPI_KEY: ${{ secrets.SEOUL_OPENAPI_KEY }}
+          TOUR_API_KEY: ${{ secrets.TOUR_API_KEY }}
+          TZ: Asia/Seoul
+
+      # 박물관·과학관 공지사항 (도슨트·교육 모집 등)
+      - name: Collect museum notices
+        run: npm run export:notices --workspace=apps/api -- ../web/public/data/notices.json
+        continue-on-error: true
+
+      # 유료 체험: 놀이의발견(하루 최대 500개씩 천천히, 지난 결과는 배포된 사이트에서 이어받음) + 구석구석
+      - name: Collect paid experiences
+        run: npm run export:paid --workspace=apps/api -- ../web/public/data
+        continue-on-error: true
+        env:
+          TOUR_API_KEY: ${{ secrets.TOUR_API_KEY }}
+          PAID_CACHE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/data/paid-cache.json
+          TZ: Asia/Seoul
+
+      - name: Build static site
+        run: npm run build --workspace=apps/web
+        env:
+          NEXT_PUBLIC_STATIC_MODE: 'true'
+          NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
+          NEXT_PUBLIC_CRAWL_WORKFLOW_URL: ${{ github.server_url }}/${{ github.repository }}/actions/workflows/pages.yml
+          # 구글 로그인: Firebase 웹 앱 설정(firebaseConfig)을 저장소 Secret FIREBASE_CONFIG에 넣으면 켜진다
+          NEXT_PUBLIC_FIREBASE_CONFIG: ${{ secrets.FIREBASE_CONFIG }}
+
+      # GitHub Pages가 _next 폴더를 무시하지 않도록
+      - run: touch apps/web/out/.nojekyll
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/web/out
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

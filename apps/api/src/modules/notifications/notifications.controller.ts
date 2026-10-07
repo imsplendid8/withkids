@@ -3,20 +3,40 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Param,
   Body,
   Query,
+  UseGuards,
+  ForbiddenException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { JwtPayload } from '../auth/auth.service';
 import {
   Notification,
   NotificationType,
   NotificationPriority,
 } from './entities/notification.entity';
 
+// 쿼리 문자열 'false'는 truthy이므로 명시적으로 변환한다.
+function parseBool(value: unknown): boolean {
+  return value === true || value === 'true';
+}
+
+// 경로의 :userId는 로그인한 본인만 다룰 수 있다.
+function assertSelf(current: JwtPayload, userId: string): void {
+  if (current.sub !== userId) {
+    throw new ForbiddenException('You can only access your own notifications');
+  }
+}
+
 @ApiTags('Notifications')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('api/notifications')
 export class NotificationsController {
   constructor(private notificationsService: NotificationsService) {}
@@ -44,18 +64,57 @@ export class NotificationsController {
     );
   }
 
+  @Get()
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Get notifications for the current user' })
+  @ApiQuery({ name: 'includeRead', required: false, type: Boolean })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  async getMyNotifications(
+    @CurrentUser() user: JwtPayload,
+    @Query('includeRead') includeRead: boolean = false,
+    @Query('limit') limit: number = 50,
+  ): Promise<Notification[]> {
+    return this.notificationsService.getUserNotifications(
+      user.sub,
+      parseBool(includeRead),
+      limit,
+    );
+  }
+
+  @Patch('read-all')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Mark all notifications as read for the current user' })
+  async markAllMineAsRead(@CurrentUser() user: JwtPayload): Promise<void> {
+    return this.notificationsService.markAllAsRead(user.sub);
+  }
+
+  @Patch(':notificationId/read')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Mark one of the current user notifications as read' })
+  async markMineAsRead(
+    @CurrentUser() user: JwtPayload,
+    @Param('notificationId') notificationId: string,
+  ): Promise<Notification> {
+    return this.notificationsService.markAsRead(notificationId, user.sub);
+  }
+
   @Get('user/:userId')
   @ApiOperation({ summary: 'Get notifications for a user' })
   @ApiQuery({ name: 'includeRead', required: false, type: Boolean })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   async getUserNotifications(
+    @CurrentUser() user: JwtPayload,
     @Param('userId') userId: string,
     @Query('includeRead') includeRead: boolean = false,
     @Query('limit') limit: number = 50,
   ): Promise<Notification[]> {
+    assertSelf(user, userId);
     return this.notificationsService.getUserNotifications(
       userId,
-      includeRead,
+      parseBool(includeRead),
       limit,
     );
   }
@@ -63,8 +122,10 @@ export class NotificationsController {
   @Get('user/:userId/unread-count')
   @ApiOperation({ summary: 'Get unread notification count for a user' })
   async getUnreadCount(
+    @CurrentUser() user: JwtPayload,
     @Param('userId') userId: string,
   ): Promise<{ count: number }> {
+    assertSelf(user, userId);
     const count = await this.notificationsService.getUnreadNotificationCount(
       userId,
     );
@@ -75,17 +136,21 @@ export class NotificationsController {
   @ApiOperation({ summary: 'Get critical notifications for a user' })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   async getCriticalNotifications(
+    @CurrentUser() user: JwtPayload,
     @Param('userId') userId: string,
     @Query('limit') limit: number = 20,
   ): Promise<Notification[]> {
+    assertSelf(user, userId);
     return this.notificationsService.getCriticalNotifications(userId, limit);
   }
 
   @Get('user/:userId/urgent')
   @ApiOperation({ summary: 'Get urgent notifications by score' })
   async getUrgentNotifications(
+    @CurrentUser() user: JwtPayload,
     @Param('userId') userId: string,
   ): Promise<Notification[]> {
+    assertSelf(user, userId);
     return this.notificationsService.getUrgentNotifications(userId);
   }
 
@@ -101,6 +166,7 @@ export class NotificationsController {
   @Get('user/:userId/stats')
   @ApiOperation({ summary: 'Get notification statistics for a user' })
   async getNotificationStats(
+    @CurrentUser() user: JwtPayload,
     @Param('userId') userId: string,
   ): Promise<{
     totalNotifications: number;
@@ -108,15 +174,17 @@ export class NotificationsController {
     criticalCount: number;
     highPriorityCount: number;
   }> {
+    assertSelf(user, userId);
     return this.notificationsService.getNotificationStats(userId);
   }
 
   @Put(':notificationId/read')
   @ApiOperation({ summary: 'Mark notification as read' })
   async markAsRead(
+    @CurrentUser() user: JwtPayload,
     @Param('notificationId') notificationId: string,
   ): Promise<Notification> {
-    return this.notificationsService.markAsRead(notificationId);
+    return this.notificationsService.markAsRead(notificationId, user.sub);
   }
 
   @Put(':notificationId/sent')
@@ -129,16 +197,21 @@ export class NotificationsController {
 
   @Put('user/:userId/read-all')
   @ApiOperation({ summary: 'Mark all notifications as read for a user' })
-  async markAllAsRead(@Param('userId') userId: string): Promise<void> {
+  async markAllAsRead(
+    @CurrentUser() user: JwtPayload,
+    @Param('userId') userId: string,
+  ): Promise<void> {
+    assertSelf(user, userId);
     return this.notificationsService.markAllAsRead(userId);
   }
 
   @Delete(':notificationId')
   @ApiOperation({ summary: 'Delete a notification' })
   async deleteNotification(
+    @CurrentUser() user: JwtPayload,
     @Param('notificationId') notificationId: string,
   ): Promise<void> {
-    return this.notificationsService.deleteNotification(notificationId);
+    return this.notificationsService.deleteNotification(notificationId, user.sub);
   }
 
   @Delete('cleanup/old')

@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Param, Put, Delete, Query } from '@nestjs/
 import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { ExperienceRunsService } from './experience-runs.service';
 import { CreateExperienceRunDto } from './dto/create-experience-run.dto';
+import { ExperienceRun } from './experience-runs.entity';
 
 @ApiTags('Experience Runs')
 @Controller('experience-runs')
@@ -38,7 +39,7 @@ export class ExperienceRunsController {
 
   @Put(':id')
   @ApiOperation({ summary: 'Update experience run' })
-  async update(@Param('id') id: string, @Body() data: any) {
+  async update(@Param('id') id: string, @Body() data: Partial<ExperienceRun>) {
     return await this.experienceRunsService.update(id, data);
   }
 

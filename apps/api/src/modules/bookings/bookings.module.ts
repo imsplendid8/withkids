@@ -3,9 +3,10 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { BookingsService } from './bookings.service';
 import { BookingsController } from './bookings.controller';
 import { Booking } from './entities/booking.entity';
+import { BookingReminder } from './entities/booking-reminder.entity';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Booking])],
+  imports: [TypeOrmModule.forFeature([Booking, BookingReminder])],
   controllers: [BookingsController],
   providers: [BookingsService],
   exports: [BookingsService],

@@ -1,4 +1,10 @@
 import { create } from 'zustand';
+import { STATIC_MODE } from '@/lib/staticMode';
+import { getLocalProfile } from '@/lib/localApi';
+import { CLOUD_ENABLED, watchCloudUser } from '@/lib/cloud';
+
+// 구글 로그인 상태 감시는 한 번만 건다
+let watchingCloud = false;
 
 export interface User {
   id: string;
@@ -15,6 +21,8 @@ export interface AuthState {
   refreshToken: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  /** 구글 로그인 후 계정 데이터를 못 가져왔을 때 로그인 화면에 보여줄 안내 */
+  cloudError: string | null;
   login: (user: User, accessToken: string, refreshToken: string) => void;
   logout: () => void;
   setUser: (user: User) => void;
@@ -28,6 +36,7 @@ export const useAuthStore = create<AuthState>((set, _get) => ({
   refreshToken: null,
   isLoading: true,
   isAuthenticated: false,
+  cloudError: null,
 
   login: (user, accessToken, refreshToken) => {
     localStorage.setItem('accessToken', accessToken);
@@ -65,6 +74,42 @@ export const useAuthStore = create<AuthState>((set, _get) => ({
   },
 
   hydrate: () => {
+    if (typeof window !== 'undefined' && STATIC_MODE && CLOUD_ENABLED) {
+      // 서버 없는 배포 + 구글 로그인: 로그인하면 계정 데이터를 가져온 뒤 들어간다
+      if (watchingCloud) return;
+      watchingCloud = true;
+      watchCloudUser(
+        (cloudUser) => {
+          if (!cloudUser) {
+            set({ user: null, isAuthenticated: false, isLoading: false });
+            return;
+          }
+          const profile = getLocalProfile();
+          set({
+            cloudError: null,
+            user: {
+              ...profile,
+              id: cloudUser.uid,
+              email: cloudUser.email,
+              profileName: profile.profileName || cloudUser.displayName,
+            },
+            isAuthenticated: true,
+            isLoading: false,
+          });
+        },
+        (message) => set({ cloudError: message, isAuthenticated: false, isLoading: false })
+      ).catch((error) => {
+        console.error('로그인 기능을 불러오지 못했습니다:', error);
+        set({ isLoading: false });
+      });
+      return;
+    }
+    if (typeof window !== 'undefined' && STATIC_MODE) {
+      // 서버 없는 배포: 로그인 없이 이 브라우저의 프로필로 바로 쓴다.
+      // 데이터가 이 브라우저에만 있어 다른 사람에게 보이지 않는다.
+      set({ user: getLocalProfile(), isAuthenticated: true, isLoading: false });
+      return;
+    }
     if (typeof window !== 'undefined') {
       const accessToken = localStorage.getItem('accessToken');
       const refreshToken = localStorage.getItem('refreshToken');

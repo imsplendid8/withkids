@@ -51,8 +51,8 @@ export class Notification {
   experienceRun: ExperienceRun | null;
 
   @Column({
-    type: 'enum',
-    enum: NotificationType,
+    type: 'varchar',
+    length: 50,
     nullable: false,
   })
   notificationType: NotificationType;
@@ -64,8 +64,8 @@ export class Notification {
   message: string | null;
 
   @Column({
-    type: 'enum',
-    enum: NotificationPriority,
+    type: 'varchar',
+    length: 50,
   })
   priority: NotificationPriority;
 

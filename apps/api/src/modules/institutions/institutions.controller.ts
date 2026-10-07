@@ -2,6 +2,7 @@ import { Controller, Get, Post, Body, Param, Put, Delete } from '@nestjs/common'
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { InstitutionsService } from './institutions.service';
 import { CreateInstitutionDto } from './dto/create-institution.dto';
+import { Institution } from './entities/institution.entity';
 
 @ApiTags('Institutions')
 @Controller('institutions')
@@ -28,7 +29,7 @@ export class InstitutionsController {
 
   @Put(':id')
   @ApiOperation({ summary: 'Update institution' })
-  async update(@Param('id') id: string, @Body() data: any) {
+  async update(@Param('id') id: string, @Body() data: Partial<Institution>) {
     return await this.institutionsService.update(id, data);
   }
 

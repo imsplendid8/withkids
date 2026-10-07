@@ -27,6 +27,9 @@ export class BroadcastingAdapter extends BaseAdapter {
       CrawlSchedule.DAILY,
     );
 
+    // 대상 사이트가 정해지지 않은 골격 어댑터. baseUrl이 존재하지 않는 호스트라
+    // 활성화하면 크롤마다 타임아웃만 발생한다. 실제 엔드포인트를 붙일 때 다시 켠다.
+    this.metadata.enabled = false;
     this.metadata.automationInfo = {
       isAutomatable: false,
       blockers: [

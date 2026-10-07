@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, Between } from 'typeorm';
+import { Repository, Brackets } from 'typeorm';
 import { Experience } from './entities/experience.entity';
+import { ExperienceRun } from '../experience-runs/experience-runs.entity';
 import { CreateExperienceDto } from './dto/create-experience.dto';
 
 interface SearchOptions {
@@ -20,7 +21,34 @@ export class ExperiencesService {
   constructor(
     @InjectRepository(Experience)
     private experiencesRepository: Repository<Experience>,
+    @InjectRepository(ExperienceRun)
+    private experienceRunsRepository: Repository<ExperienceRun>,
   ) {}
+
+  /**
+   * 지금 접수 중이거나 앞으로 `days`일 안에 접수가 시작되는 회차.
+   * 선착순 프로그램은 접수 시작 시각을 놓치면 끝이라 대시보드에 띄운다.
+   */
+  async getBookingSchedule(days: number): Promise<ExperienceRun[]> {
+    const now = new Date();
+    const until = new Date(now.getTime() + days * 24 * 60 * 60 * 1000);
+
+    return await this.experienceRunsRepository
+      .createQueryBuilder('run')
+      .innerJoinAndSelect('run.experience', 'experience')
+      .innerJoinAndSelect('experience.institution', 'institution')
+      .where('experience.isActive = :active', { active: true })
+      .andWhere(
+        new Brackets((qb) =>
+          qb
+            .where('run.bookingOpenAt BETWEEN :now AND :until', { now, until })
+            .orWhere('run.bookingOpenAt <= :now AND run.bookingCloseAt >= :now', { now }),
+        ),
+      )
+      .orderBy('run.bookingOpenAt', 'ASC')
+      .take(20)
+      .getMany();
+  }
 
   async create(createExperienceDto: CreateExperienceDto): Promise<Experience> {
     const experience = this.experiencesRepository.create(createExperienceDto);

@@ -65,7 +65,7 @@ interface Adapter {
 ## 🛠️ Adapter 작성 예제
 
 ### Mock Adapter (현재)
-위치: `apps/api/src/crawler/adapters/mock.adapter.ts`
+실제 예시: `apps/api/src/crawler/adapters/seoul-public-service.adapter.ts` (아래 MockAdapter 코드는 구조 설명용)
 
 테스트 데이터를 반환하는 기본 adapter입니다.
 

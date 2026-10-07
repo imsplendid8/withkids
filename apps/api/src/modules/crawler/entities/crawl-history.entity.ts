@@ -31,8 +31,8 @@ export class CrawlHistory {
   crawlCompletedAt: Date | null;
 
   @Column({
-    type: 'enum',
-    enum: CrawlStatus,
+    type: 'varchar',
+    length: 50,
   })
   status: CrawlStatus;
 

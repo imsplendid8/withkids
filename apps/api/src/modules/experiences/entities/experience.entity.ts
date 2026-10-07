@@ -43,18 +43,8 @@ export class Experience {
   isRecurring: boolean;
 
   @Column({
-    type: 'enum',
-    enum: [
-      'DOCENT',
-      'WORKSHOP',
-      'FACTORY_TOUR',
-      'EXHIBITION',
-      'PERFORMANCE',
-      'EDUCATIONAL',
-      'OUTDOOR',
-      'SPECIAL_EVENT',
-      'OTHER',
-    ],
+    type: 'varchar',
+    length: 50,
     nullable: true,
   })
   experienceCategory: string;
@@ -75,8 +65,8 @@ export class Experience {
   requiredGuardian: boolean;
 
   @Column({
-    type: 'enum',
-    enum: ['FIRST_COME', 'LOTTERY', 'ALWAYS_AVAILABLE'],
+    type: 'varchar',
+    length: 50,
     default: 'FIRST_COME',
   })
   bookingMethod: string;

@@ -46,16 +46,16 @@ export class ChangeLog {
   experienceRun: ExperienceRun;
 
   @Column({
-    type: 'enum',
-    enum: ChangeType,
+    type: 'varchar',
+    length: 50,
     nullable: false,
   })
   changeType: ChangeType;
 
   @Column({
-    type: 'enum',
-    enum: ChangeSeverity,
-    default: ChangeSeverity.MEDIUM,
+    type: 'varchar',
+    length: 50,
+    default: 'MEDIUM',
   })
   severity: ChangeSeverity;
 

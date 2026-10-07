@@ -58,7 +58,8 @@ export class AdapterState {
 
   recordFailure(): void {
     this.lastCrawlAt = new Date();
-    this.consecutiveFailures++;
+    // 새로 만든 엔티티에는 컬럼 기본값(0)이 아직 없다. undefined++는 NaN이 된다.
+    this.consecutiveFailures = (this.consecutiveFailures ?? 0) + 1;
 
     if (this.consecutiveFailures >= 5) {
       this.isDisabled = true;

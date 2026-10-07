@@ -34,8 +34,8 @@ export class BookingPattern {
   experience: Experience;
 
   @Column({
-    type: 'enum',
-    enum: PatternType,
+    type: 'varchar',
+    length: 50,
     nullable: false,
   })
   patternType: PatternType;

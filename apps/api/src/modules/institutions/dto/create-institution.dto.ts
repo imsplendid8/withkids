@@ -13,7 +13,7 @@ enum InstitutionType {
 export class CreateInstitutionDto {
   @IsString()
   @ApiProperty({ description: 'Institution name' })
-  name: string;
+  institutionName: string;
 
   @IsOptional()
   @IsString()

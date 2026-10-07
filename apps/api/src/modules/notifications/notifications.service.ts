@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { LessThan, Repository } from 'typeorm';
 import {
   Notification,
   NotificationType,
@@ -41,14 +41,14 @@ export class NotificationsService {
   ): Promise<Notification[]> {
     const query = this.notificationsRepository
       .createQueryBuilder('n')
-      .where('n.user_id = :userId', { userId });
+      .where('n.userId = :userId', { userId });
 
     if (!includeRead) {
-      query.andWhere('n.is_read = false');
+      query.andWhere('n.isRead = false');
     }
 
     return query
-      .orderBy('n.created_at', 'DESC')
+      .orderBy('n.createdAt', 'DESC')
       .take(limit)
       .getMany();
   }
@@ -59,13 +59,13 @@ export class NotificationsService {
     });
   }
 
-  async markAsRead(notificationId: string): Promise<Notification> {
+  async markAsRead(notificationId: string, userId?: string): Promise<Notification> {
     const notification = await this.notificationsRepository.findOne({
-      where: { id: notificationId },
+      where: userId ? { id: notificationId, userId } : { id: notificationId },
     });
 
     if (!notification) {
-      throw new Error('Notification not found');
+      throw new NotFoundException('Notification not found');
     }
 
     notification.markAsRead();
@@ -73,16 +73,10 @@ export class NotificationsService {
   }
 
   async markAllAsRead(userId: string): Promise<void> {
-    await this.notificationsRepository
-      .createQueryBuilder()
-      .update(Notification)
-      .set({
-        isRead: true,
-        readAt: new Date(),
-      })
-      .where('user_id = :userId', { userId })
-      .andWhere('is_read = false')
-      .execute();
+    await this.notificationsRepository.update(
+      { userId, isRead: false },
+      { isRead: true, readAt: new Date() },
+    );
   }
 
   async markAsSent(notificationId: string): Promise<Notification> {
@@ -133,8 +127,10 @@ export class NotificationsService {
       .slice(0, 20);
   }
 
-  async deleteNotification(notificationId: string): Promise<void> {
-    await this.notificationsRepository.delete({ id: notificationId });
+  async deleteNotification(notificationId: string, userId?: string): Promise<void> {
+    await this.notificationsRepository.delete(
+      userId ? { id: notificationId, userId } : { id: notificationId },
+    );
   }
 
   async deleteOldNotifications(olderThanDays: number = 30): Promise<number> {
@@ -142,7 +138,7 @@ export class NotificationsService {
     cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
 
     const result = await this.notificationsRepository.delete({
-      createdAt: (() => cutoffDate as any)(),
+      createdAt: LessThan(cutoffDate),
       isRead: true,
     });
 

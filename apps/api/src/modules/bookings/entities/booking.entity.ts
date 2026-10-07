@@ -53,9 +53,9 @@ export class Booking {
   specialRequests: string;
 
   @Column({
-    type: 'enum',
-    enum: BookingStatus,
-    default: BookingStatus.PENDING,
+    type: 'varchar',
+    length: 50,
+    default: 'PENDING',
   })
   status: BookingStatus;
 

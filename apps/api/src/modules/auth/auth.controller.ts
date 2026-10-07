@@ -18,8 +18,14 @@ import { JwtPayload } from './auth.service';
 export class AuthController {
   constructor(private authService: AuthService) {}
 
+  @Get('setup-status')
+  @ApiOperation({ summary: '처음 계정을 만들어야 하는 상태인지' })
+  async getSetupStatus(): Promise<{ needsSetup: boolean }> {
+    return { needsSetup: await this.authService.needsSetup() };
+  }
+
   @Post('register')
-  @ApiOperation({ summary: 'Register a new user' })
+  @ApiOperation({ summary: 'Register a new user (첫 계정만 허용)' })
   async register(
     @Body()
     body: {
@@ -106,12 +112,18 @@ export class AuthController {
     body: {
       email: string;
     },
-  ): Promise<{ resetToken: string }> {
+  ): Promise<{ message: string }> {
     if (!body.email) {
       throw new BadRequestException('Email is required');
     }
-    const resetToken = await this.authService.resetPasswordRequest(body.email);
-    return { resetToken };
+    // 토큰을 응답으로 돌려주면 이메일만 아는 사람이 계정을 탈취할 수 있다.
+    // 메일 발송이 연결되기 전까지는 토큰을 요청자에게 노출하지 않는다.
+    try {
+      await this.authService.resetPasswordRequest(body.email);
+    } catch {
+      // 계정 존재 여부도 노출하지 않는다.
+    }
+    return { message: 'If the account exists, a reset link will be sent' };
   }
 
   @Post('password-reset')

@@ -1,44 +1,37 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuthStore } from '@/store/authStore';
 import { useBookmarkStore } from '@/store/bookmarkStore';
 import { apiClient } from '@/lib/api';
 import { MainLayout } from '@/components/layouts/MainLayout';
-import { FiCalendar, FiBell, FiBookmark, FiTrendingUp } from 'react-icons/fi';
+import { CrawlStatusPanel } from '@/components/CrawlStatusPanel';
+import { dDayLabel, daysFromToday, formatMonthDay, formatTime } from '@/lib/bookingDates';
+import { FiBookmark, FiClock, FiExternalLink } from 'react-icons/fi';
 
-interface Booking {
+interface ScheduleRun {
   id: string;
-  confirmationNumber: string;
-  status: string;
-  createdAt: string;
-  selectedChildren: Array<{ id: string; name: string; age: number }>;
-  totalPrice?: number;
-  experience?: {
+  bookingOpenAt: string | null;
+  bookingCloseAt: string | null;
+  price: number | null;
+  experience: {
     id: string;
     programName: string;
-    institution: { institutionName: string };
+    programUrl?: string | null;
+    bookingUrl?: string | null;
+    institution?: { institutionName: string };
+    area?: string | null;
   };
-}
-
-interface Notification {
-  id: string;
-  title: string;
-  message: string;
-  isRead?: boolean;
 }
 
 export default function DashboardPage() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading } = useAuthStore();
-  const { bookmarks, hydrate } = useBookmarkStore();
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [stats, setStats] = useState({
-    upcomingBookings: 0,
-    unreadNotifications: 0,
-    savedPrograms: 0,
-    trendingPrograms: 0,
-  });
+  const { bookmarks, hydrate: hydrateBookmarks } = useBookmarkStore();
+
+  const [schedule, setSchedule] = useState<ScheduleRun[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
+  const [scheduleError, setScheduleError] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -46,44 +39,24 @@ export default function DashboardPage() {
     }
   }, [isAuthenticated, isLoading, router]);
 
+  const load = useCallback(async () => {
+    setIsLoadingData(true);
+    try {
+      const data = await apiClient.getBookingSchedule(14);
+      setSchedule(Array.isArray(data) ? data : []);
+      setScheduleError(false);
+    } catch {
+      setScheduleError(true);
+    }
+
+    setIsLoadingData(false);
+  }, []);
+
   useEffect(() => {
     if (!isAuthenticated) return;
-
-    const fetchDashboardData = async () => {
-      try {
-        setIsLoadingData(true);
-        hydrate();
-
-        // Fetch bookings
-        const bookingsData = await apiClient.getBookings();
-        const bookingsList = Array.isArray(bookingsData) ? bookingsData : bookingsData.data || [];
-        setBookings(bookingsList.slice(0, 3)); // Show first 3 bookings
-
-        // Fetch notifications
-        const notifications = await apiClient.getNotifications();
-        const unreadCount = Array.isArray(notifications)
-          ? notifications.filter((n: Notification) => !n.isRead).length
-          : 0;
-
-        setStats({
-          upcomingBookings: bookingsList.filter((b: Booking) => b.status === 'PENDING' || b.status === 'CONFIRMED').length,
-          unreadNotifications: unreadCount,
-          savedPrograms: bookmarks.length,
-          trendingPrograms: 0,
-        });
-      } catch (err) {
-        console.error('대시보드 데이터 로드 실패:', err);
-        setStats((prev) => ({
-          ...prev,
-          savedPrograms: bookmarks.length,
-        }));
-      } finally {
-        setIsLoadingData(false);
-      }
-    };
-
-    fetchDashboardData();
-  }, [isAuthenticated, hydrate, bookmarks.length]);
+    hydrateBookmarks();
+    load();
+  }, [isAuthenticated, hydrateBookmarks, load]);
 
   if (isLoading || !isAuthenticated) {
     return (
@@ -93,164 +66,157 @@ export default function DashboardPage() {
     );
   }
 
+  const today = new Date();
+
   return (
     <MainLayout>
-      <div className="space-y-8">
-        {/* Welcome Section */}
-        <div className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg shadow-lg p-8 text-white">
-          <h1 className="text-3xl font-bold mb-2">
-            안녕하세요, {user?.profileName || user?.email}! 👋
+      <div className="space-y-6">
+        {/* 인사 */}
+        <section className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg shadow-lg p-6 md:p-8 text-white">
+          <p className="text-blue-100 text-sm">{formatMonthDay(today)}</p>
+          <h1 className="text-2xl md:text-3xl font-bold mt-1">
+            안녕하세요, {user?.profileName || '보호자'}님
           </h1>
-          <p className="text-blue-100">
-            아이들의 다음 경험을 찾아보세요
-          </p>
-        </div>
+        </section>
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Upcoming Bookings */}
-          <button
-            onClick={() => router.push('/bookings')}
-            className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow text-left"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm font-medium">예정된 예약</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">{stats.upcomingBookings}</p>
-              </div>
-              <div className="bg-blue-100 p-3 rounded-lg">
-                <FiCalendar className="text-blue-600" size={24} />
-              </div>
-            </div>
-          </button>
+        {/* 요약 */}
+        <section className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+          <StatCard
+            label="찜한 프로그램"
+            value={`${bookmarks.length}개`}
+            icon={<FiBookmark className="text-purple-600" size={22} />}
+            iconBg="bg-purple-100"
+            href="/experiences/saved"
+          />
+        </section>
 
-          {/* Notifications */}
-          <button
-            onClick={() => router.push('/notifications')}
-            className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow text-left"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm font-medium">새 알림</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">{stats.unreadNotifications}</p>
-              </div>
-              <div className="bg-orange-100 p-3 rounded-lg">
-                <FiBell className="text-orange-600" size={24} />
-              </div>
-            </div>
-          </button>
-
-          {/* Saved Programs */}
-          <button
-            onClick={() => router.push('/experiences/saved')}
-            className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow text-left"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm font-medium">저장된 프로그램</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">{stats.savedPrograms}</p>
-              </div>
-              <div className="bg-green-100 p-3 rounded-lg">
-                <FiBookmark className="text-green-600" size={24} />
-              </div>
-            </div>
-          </button>
-
-          {/* Trending */}
-          <div className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm font-medium">인기 프로그램</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">{stats.trendingPrograms}</p>
-              </div>
-              <div className="bg-purple-100 p-3 rounded-lg">
-                <FiTrendingUp className="text-purple-600" size={24} />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Content Sections */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Upcoming Bookings Section */}
-          <div className="lg:col-span-2 bg-white rounded-lg shadow p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-bold text-gray-900">예정된 예약</h2>
-              {bookings.length > 0 && (
-                <button
-                  onClick={() => router.push('/bookings')}
-                  className="text-sm text-blue-600 hover:text-blue-700 font-medium"
-                >
-                  모두 보기
-                </button>
-              )}
-            </div>
-            {isLoadingData ? (
-              <div className="text-center py-8 text-gray-600">로딩 중...</div>
-            ) : bookings.length > 0 ? (
-              <div className="space-y-4">
-                {bookings.map((booking) => {
-                  const statusMap: Record<string, { bg: string; text: string; label: string }> = {
-                    PENDING: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: '대기 중' },
-                    CONFIRMED: { bg: 'bg-green-100', text: 'text-green-800', label: '확인됨' },
-                    COMPLETED: { bg: 'bg-blue-100', text: 'text-blue-800', label: '완료' },
-                    CANCELLED: { bg: 'bg-red-100', text: 'text-red-800', label: '취소' },
-                  };
-                  const status = statusMap[booking.status] || statusMap.PENDING;
-                  return (
-                    <div
-                      key={booking.id}
-                      onClick={() => router.push(`/bookings/${booking.id}`)}
-                      className="border border-gray-200 rounded-lg p-4 hover:border-blue-300 hover:shadow transition-all cursor-pointer"
-                    >
-                      <div className="flex justify-between items-start mb-2">
-                        <h3 className="font-semibold text-gray-900">
-                          {booking.experience?.programName || '프로그램'}
-                        </h3>
-                        <span className={`px-2 py-1 text-xs font-semibold rounded ${status.bg} ${status.text}`}>
-                          {status.label}
-                        </span>
-                      </div>
-                      <p className="text-sm text-gray-600 mb-2">
-                        📅 {new Date(booking.createdAt).toLocaleDateString('ko-KR')}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        👥 {booking.selectedChildren.length}명 • 💰 {booking.totalPrice?.toLocaleString()}원
-                      </p>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-gray-600 mb-4">예약이 없습니다.</p>
-                <button
-                  onClick={() => router.push('/experiences')}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
-                >
-                  프로그램 둘러보기
-                </button>
-              </div>
-            )}
+        {/* 접수 일정 */}
+        <section className="bg-white rounded-lg shadow p-6">
+          <div className="mb-4">
+            <h2 className="text-lg font-bold text-gray-900">접수 일정</h2>
+            <p className="text-xs text-gray-500 mt-1">
+              접수 중이거나 2주 안에 접수가 시작되는 프로그램
+            </p>
           </div>
 
-          {/* Recommendations Section */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">추천 프로그램</h2>
-            <div className="space-y-3">
-              <div className="text-center py-4 text-gray-600 text-sm">
-                <p className="mb-3">프로그램을 찾아보세요</p>
-                <button
-                  onClick={() => router.push('/experiences')}
-                  className="w-full px-3 py-2 bg-blue-600 text-white text-xs font-medium rounded hover:bg-blue-700 transition-colors"
-                >
-                  프로그램 둘러보기
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+          {isLoadingData ? (
+            <p className="text-gray-500 py-8 text-center">불러오는 중...</p>
+          ) : scheduleError ? (
+            <p className="text-red-600 py-8 text-center">접수 일정을 불러오지 못했습니다.</p>
+          ) : schedule.length === 0 ? (
+            <p className="text-gray-600 py-8 text-center text-sm">
+              지금 확인된 접수 일정이 없어요.
+              <br />
+              아래에서 수집을 돌리면 새 프로그램이 여기에 표시됩니다.
+            </p>
+          ) : (
+            <ul className="divide-y divide-gray-100">
+              {schedule.slice(0, 8).map((run) => (
+                <ScheduleItem key={run.id} run={run} />
+              ))}
+            </ul>
+          )}
+
+          <CrawlStatusPanel onCompleted={load} />
+        </section>
       </div>
     </MainLayout>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  icon,
+  iconBg,
+  href,
+}: {
+  label: string;
+  value: string;
+  icon: React.ReactNode;
+  iconBg: string;
+  href: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="bg-white rounded-lg shadow p-4 sm:p-5 hover:shadow-md transition-shadow"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-gray-600 text-sm whitespace-nowrap">{label}</p>
+          <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1 whitespace-nowrap">
+            {value}
+          </p>
+        </div>
+        <div className={`${iconBg} p-2.5 rounded-lg shrink-0 hidden sm:block`}>{icon}</div>
+      </div>
+    </Link>
+  );
+}
+
+function ScheduleItem({ run }: { run: ScheduleRun }) {
+  const now = new Date();
+  const openAt = run.bookingOpenAt ? new Date(run.bookingOpenAt) : null;
+  const closeAt = run.bookingCloseAt ? new Date(run.bookingCloseAt) : null;
+  const isOpen = openAt !== null && openAt <= now;
+  const externalUrl = run.experience.bookingUrl || run.experience.programUrl;
+
+  const body = (
+    <div className="py-3 flex items-start gap-3">
+      <div className="min-w-0 flex-1">
+        <p className="font-medium text-gray-900 truncate">{run.experience.programName}</p>
+        <p className="text-xs text-gray-500 truncate">
+          {run.experience.area && (
+            <span className="font-semibold text-gray-700">{run.experience.area} · </span>
+          )}
+          {run.experience.institution?.institutionName ?? '-'}
+        </p>
+        <p className="text-sm mt-1 flex items-center gap-1 text-gray-700">
+          <FiClock size={13} />
+          {isOpen
+            ? closeAt
+              ? `${formatMonthDay(closeAt)} ${formatTime(closeAt)} 마감`
+              : '접수 중'
+            : openAt
+              ? `${formatMonthDay(openAt)} ${formatTime(openAt)} 접수 시작`
+              : '접수 일정 미정'}
+        </p>
+      </div>
+      <div className="shrink-0 flex flex-col items-end gap-1">
+        {isOpen ? (
+          <span className="px-2 py-0.5 text-xs font-semibold rounded bg-green-100 text-green-800">
+            접수 중
+          </span>
+        ) : openAt ? (
+          <span className="px-2 py-0.5 text-xs font-semibold rounded bg-blue-100 text-blue-800">
+            {dDayLabel(daysFromToday(openAt))}
+          </span>
+        ) : null}
+        {externalUrl && <FiExternalLink size={14} className="text-gray-400" />}
+      </div>
+    </div>
+  );
+
+  return (
+    <li>
+      {externalUrl ? (
+        <a
+          href={externalUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block hover:bg-gray-50 -mx-2 px-2 rounded"
+        >
+          {body}
+        </a>
+      ) : (
+        <Link
+          href={`/experiences/${run.experience.id}`}
+          className="block hover:bg-gray-50 -mx-2 px-2 rounded"
+        >
+          {body}
+        </Link>
+      )}
+    </li>
   );
 }

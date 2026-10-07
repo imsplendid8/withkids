@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // ESM 전용 의존성(@nestjs/bull, @nestjs/schedule)을 Jest가 CommonJS로 변환할 수 있게 한다.
+    "allowJs": true
+  },
+  "include": ["src/**/*", "test/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

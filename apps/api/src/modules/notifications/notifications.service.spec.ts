@@ -15,6 +15,7 @@ describe('NotificationsService', () => {
       find: jest.fn(),
       count: jest.fn(),
       delete: jest.fn(),
+      update: jest.fn(),
       createQueryBuilder: jest.fn(),
     };
 
@@ -72,47 +73,43 @@ describe('NotificationsService', () => {
   });
 
   describe('getUserNotifications', () => {
-    it('should retrieve all notifications for a user', async () => {
+    // 서비스는 쿼리빌더로 조회한다. 어떤 조건이 붙는지를 검증한다.
+    const mockQueryBuilder = (result: unknown[]) => {
+      const qb: any = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(result),
+      };
+      mockNotificationRepository.createQueryBuilder.mockReturnValue(qb);
+      return qb;
+    };
+
+    it('should retrieve read and unread notifications when includeRead is true', async () => {
       const mockNotifications: any = [
-        {
-          id: 'notification-1',
-          userId: 'user-1',
-          notificationType: NotificationType.BOOKING_OPENED_TODAY,
-          title: 'Booking Opened',
-          isRead: false,
-        },
-        {
-          id: 'notification-2',
-          userId: 'user-1',
-          notificationType: NotificationType.NEW_PROGRAM_DISCOVERED,
-          title: 'New Program',
-          isRead: true,
-        },
+        { id: 'notification-1', userId: 'user-1', isRead: false },
+        { id: 'notification-2', userId: 'user-1', isRead: true },
       ];
+      const qb = mockQueryBuilder(mockNotifications);
 
-      mockNotificationRepository.find.mockResolvedValue(mockNotifications);
-
-      const result = await service.getUserNotifications('user-1', false, 50);
+      const result = await service.getUserNotifications('user-1', true, 50);
 
       expect(result).toEqual(mockNotifications);
-      expect(result).toHaveLength(2);
+      expect(qb.where).toHaveBeenCalledWith('n.userId = :userId', { userId: 'user-1' });
+      expect(qb.andWhere).not.toHaveBeenCalled();
+      expect(qb.orderBy).toHaveBeenCalledWith('n.createdAt', 'DESC');
+      expect(qb.take).toHaveBeenCalledWith(50);
     });
 
-    it('should retrieve only unread notifications when includeRead is false', async () => {
-      const mockNotifications: any = [
-        {
-          id: 'notification-1',
-          userId: 'user-1',
-          isRead: false,
-        },
-      ];
+    it('should filter to unread notifications when includeRead is false', async () => {
+      const qb = mockQueryBuilder([{ id: 'notification-1', userId: 'user-1', isRead: false }]);
 
-      mockNotificationRepository.find.mockResolvedValue(mockNotifications);
-
-      const result = await service.getUserNotifications('user-1', false, 50);
+      const result = await service.getUserNotifications('user-1', false, 20);
 
       expect(result).toHaveLength(1);
-      expect(result[0].isRead).toBe(false);
+      expect(qb.andWhere).toHaveBeenCalledWith('n.isRead = false');
+      expect(qb.take).toHaveBeenCalledWith(20);
     });
   });
 
@@ -131,64 +128,60 @@ describe('NotificationsService', () => {
 
   describe('markAsRead', () => {
     it('should mark a notification as read', async () => {
-      const mockNotification: any = {
+      const notification = Object.assign(new Notification(), {
         id: 'notification-1',
         userId: 'user-1',
         isRead: false,
         readAt: null,
-      };
-
-      mockNotificationRepository.findOne.mockResolvedValue(mockNotification);
-      mockNotificationRepository.save.mockResolvedValue({
-        ...mockNotification,
-        isRead: true,
-        readAt: new Date(),
       });
+
+      mockNotificationRepository.findOne.mockResolvedValue(notification);
+      mockNotificationRepository.save.mockImplementation(async (entity: Notification) => entity);
 
       const result = await service.markAsRead('notification-1');
 
       expect(result.isRead).toBe(true);
-      expect(mockNotificationRepository.save).toHaveBeenCalled();
+      expect(result.readAt).toBeInstanceOf(Date);
+      expect(mockNotificationRepository.save).toHaveBeenCalledWith(notification);
+    });
+
+    it('should throw when the notification does not exist', async () => {
+      mockNotificationRepository.findOne.mockResolvedValue(null);
+
+      await expect(service.markAsRead('missing')).rejects.toThrow('Notification not found');
+      expect(mockNotificationRepository.save).not.toHaveBeenCalled();
     });
   });
 
   describe('markAllAsRead', () => {
     it('should mark all notifications as read for a user', async () => {
-      mockNotificationRepository.find.mockResolvedValue([
-        { id: 'notification-1', userId: 'user-1', isRead: false },
-        { id: 'notification-2', userId: 'user-1', isRead: false },
-      ]);
-
-      mockNotificationRepository.save.mockResolvedValue({});
+      mockNotificationRepository.update.mockResolvedValue({ affected: 2 });
 
       await service.markAllAsRead('user-1');
 
-      expect(mockNotificationRepository.find).toHaveBeenCalledWith({
-        where: { userId: 'user-1', isRead: false },
-      });
-      expect(mockNotificationRepository.save).toHaveBeenCalled();
+      expect(mockNotificationRepository.update).toHaveBeenCalledWith(
+        { userId: 'user-1', isRead: false },
+        expect.objectContaining({ isRead: true }),
+      );
     });
   });
 
   describe('markAsSent', () => {
     it('should mark a notification as sent', async () => {
-      const mockNotification: any = {
+      const notification = Object.assign(new Notification(), {
         id: 'notification-1',
         isSent: false,
         sentAt: null,
-      };
-
-      mockNotificationRepository.findOne.mockResolvedValue(mockNotification);
-      mockNotificationRepository.save.mockResolvedValue({
-        ...mockNotification,
-        isSent: true,
-        sentAt: new Date(),
       });
+
+      mockNotificationRepository.findOne.mockResolvedValue(notification);
+      mockNotificationRepository.save.mockImplementation(async (entity: Notification) => entity);
 
       const result = await service.markAsSent('notification-1');
 
       expect(result.isSent).toBe(true);
-      expect(mockNotificationRepository.save).toHaveBeenCalled();
+      expect(result.sentAt).toBeInstanceOf(Date);
+      expect(mockNotificationRepository.save).toHaveBeenCalledWith(notification);
     });
   });
 
@@ -281,18 +274,14 @@ describe('NotificationsService', () => {
 
   describe('deleteOldNotifications', () => {
     it('should delete old read notifications older than specified days', async () => {
-      const mockQueryBuilder: any = {
-        where: jest.fn().mockReturnThis(),
-        andWhere: jest.fn().mockReturnThis(),
-        delete: jest.fn().mockReturnThis(),
-        execute: jest.fn().mockResolvedValue({ affected: 10 }),
-      };
-
-      mockNotificationRepository.createQueryBuilder.mockReturnValue(mockQueryBuilder);
+      mockNotificationRepository.delete.mockResolvedValue({ affected: 10 });
 
       const result = await service.deleteOldNotifications(30);
 
       expect(result).toBe(10);
+      const where = mockNotificationRepository.delete.mock.calls[0][0];
+      expect(where.isRead).toBe(true);
+      expect(where.createdAt.type).toBe('lessThan');
     });
   });
 

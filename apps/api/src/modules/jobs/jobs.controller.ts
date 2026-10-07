@@ -1,8 +1,11 @@
-import { Controller, Get, Post } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JobsService } from './jobs.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @ApiTags('Jobs')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('api/jobs')
 export class JobsController {
   constructor(private jobsService: JobsService) {}

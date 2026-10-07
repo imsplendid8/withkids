@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { NotificationDeliveryService } from './notification-delivery.service';
 import { NotificationsService } from './notifications.service';
 import { UsersService } from '../users/users.service';
-import { Notification, NotificationType, NotificationPriority } from './entities/notification.entity';
+import { NotificationType, NotificationPriority } from './entities/notification.entity';
 
 describe('NotificationDeliveryService', () => {
   let service: NotificationDeliveryService;

@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ForbiddenException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { UsersService } from '../users/users.service';
@@ -20,18 +20,20 @@ export interface AuthToken {
 export class AuthService {
   constructor(
     private usersService: UsersService,
-    private jwtService: JwtService,
+    private jwtService: JwtService
   ) {}
 
   async register(
     email: string,
     password: string,
-    profileName?: string,
+    profileName?: string
   ): Promise<{ userId: string; email: string; accessToken: string }> {
+    if (!(await this.isRegistrationOpen())) {
+      throw new ForbiddenException('이미 계정이 있습니다. 로그인해 주세요.');
+    }
     const passwordHash = await this.hashPassword(password);
-    const user = await this.usersService.createUser(email, profileName, undefined);
-
-    await this.usersService.updateUserPassword(user.id, passwordHash);
+    // 사용자·설정·비밀번호를 한 번에: 중간에 실패해 비밀번호 없는 계정만 남으면 다시 가입할 수 없다
+    const user = await this.usersService.createUserWithPassword(email, passwordHash, profileName);
 
     const tokens = this.generateTokens(user.id, email);
     return {
@@ -39,6 +41,20 @@ export class AuthService {
       email: user.email,
       accessToken: tokens.accessToken,
     };
+  }
+
+  /**
+   * 혼자 쓰는 앱이라 첫 계정 하나만 가입을 받는다. 터널로 공개돼도 남이 가입할 수 없다.
+   * 계정을 더 만들어야 하면 ALLOW_REGISTRATION=true 로 잠시 연다.
+   */
+  async isRegistrationOpen(): Promise<boolean> {
+    if (process.env.ALLOW_REGISTRATION === 'true') return true;
+    return this.needsSetup();
+  }
+
+  /** 계정이 하나도 없어 첫 계정을 만들어야 하는 상태인지 */
+  async needsSetup(): Promise<boolean> {
+    return (await this.usersService.countUsers()) === 0;
   }
 
   async login(email: string, password: string): Promise<AuthToken> {
@@ -71,7 +87,7 @@ export class AuthService {
   async refreshAccessToken(refreshToken: string): Promise<AuthToken> {
     try {
       const payload = await this.jwtService.verifyAsync(refreshToken, {
-        secret: process.env.JWT_REFRESH_SECRET || 'refresh-secret',
+        secret: this.getRefreshSecret(),
       });
 
       const user = await this.usersService.getUserById(payload.sub);
@@ -111,7 +127,7 @@ export class AuthService {
       {
         secret: process.env.JWT_SECRET,
         expiresIn: '1h',
-      },
+      }
     );
 
     return resetToken;
@@ -137,7 +153,7 @@ export class AuthService {
     const accessToken = this.jwtService.sign(payload);
 
     const refreshToken = this.jwtService.sign(payload, {
-      secret: process.env.JWT_REFRESH_SECRET || 'refresh-secret',
+      secret: this.getRefreshSecret(),
       expiresIn: '7d',
     });
 
@@ -146,6 +162,15 @@ export class AuthService {
       refreshToken,
       expiresIn: 86400,
     };
+  }
+
+  // 별도 시크릿이 없으면 JWT_SECRET에서 파생한다(액세스 토큰과는 다른 값).
+  // 소스에 박힌 고정값을 쓰면 누구나 리프레시 토큰을 위조할 수 있다.
+  private getRefreshSecret(): string {
+    if (process.env.JWT_REFRESH_SECRET) {
+      return process.env.JWT_REFRESH_SECRET;
+    }
+    return `${process.env.JWT_SECRET || 'your-secret-key'}:refresh`;
   }
 
   private async hashPassword(password: string): Promise<string> {

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, MoreThan } from 'typeorm';
+import { In, Repository, MoreThan } from 'typeorm';
 import { CrawlHistory, CrawlStatus } from './entities/crawl-history.entity';
 import { AdapterState } from './entities/adapter-state.entity';
 
@@ -80,6 +80,21 @@ export class CrawlMonitoringService {
     await this.adapterStateRepository.save(adapterState);
   }
 
+  /** 어댑터마다 가장 최근 수집 기록 하나. 한 번도 돌지 않았으면 null. */
+  async getLatestCrawls(
+    adapterNames: string[],
+  ): Promise<Array<{ adapterName: string; lastCrawl: CrawlHistory | null }>> {
+    return Promise.all(
+      adapterNames.map(async (adapterName) => ({
+        adapterName,
+        lastCrawl: await this.crawlHistoryRepository.findOne({
+          where: { adapterName },
+          order: { crawlStartedAt: 'DESC' },
+        }),
+      })),
+    );
+  }
+
   async getCrawlHistory(
     adapterName: string,
     limit: number = 100,
@@ -104,10 +119,7 @@ export class CrawlMonitoringService {
 
     return this.crawlHistoryRepository.find({
       where: {
-        status: (() => {
-          // Placeholder for querying failed status
-          return CrawlStatus.FAILURE as any;
-        })() as any,
+        status: In([CrawlStatus.FAILURE, CrawlStatus.PARTIAL_FAILURE]),
         createdAt: MoreThan(since),
       },
       order: { createdAt: 'DESC' },

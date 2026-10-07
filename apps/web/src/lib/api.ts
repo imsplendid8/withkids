@@ -1,6 +1,23 @@
 import axios, { AxiosInstance } from 'axios';
+import { STATIC_MODE } from './staticMode';
+import { LocalApiClient } from './localApi';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+export interface LatestCrawl {
+  adapterName: string;
+  lastCrawl: {
+    id: string;
+    status: 'RUNNING' | 'SUCCESS' | 'PARTIAL_FAILURE' | 'FAILURE';
+    crawlStartedAt: string;
+    crawlCompletedAt: string | null;
+    programsFound: number;
+    programsCreated: number;
+    programsUpdated: number;
+    errorMessage: string | null;
+  } | null;
+}
+
+// 같은 오리진의 /api 로 보내면 next.config.js의 rewrite가 API 서버로 넘긴다.
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
 
 class ApiClient {
   private client: AxiosInstance;
@@ -35,6 +52,12 @@ class ApiClient {
   }
 
   // Auth endpoints
+  /** 계정이 하나도 없어 첫 계정을 만들어야 하는지 */
+  async getSetupStatus(): Promise<{ needsSetup: boolean }> {
+    const response = await this.client.get('/auth/setup-status');
+    return response.data;
+  }
+
   async register(email: string, password: string, profileName?: string) {
     const response = await this.client.post('/auth/register', {
       email,
@@ -56,6 +79,12 @@ class ApiClient {
     const response = await this.client.post('/auth/refresh', {
       refreshToken,
     });
+    return response.data;
+  }
+
+  /** 이름·자녀 나이까지 포함한 로그인 사용자 정보 */
+  async getMe() {
+    const response = await this.client.get('/users/me');
     return response.data;
   }
 
@@ -115,6 +144,11 @@ class ApiClient {
     return response.data;
   }
 
+  async getBookingSchedule(days = 14) {
+    const response = await this.client.get('/experiences/booking-schedule', { params: { days } });
+    return response.data;
+  }
+
   async getExperienceById(id: string) {
     const response = await this.client.get(`/experiences/${id}`);
     return response.data;
@@ -123,6 +157,7 @@ class ApiClient {
   // Booking endpoints
   async createBooking(data: {
     experienceId: string;
+    experienceDate: string;
     selectedChildren: Array<{ id: string; name: string; age: number }>;
     specialRequests?: string;
     totalPrice?: number;
@@ -138,6 +173,22 @@ class ApiClient {
 
   async getBookingById(id: string) {
     const response = await this.client.get(`/bookings/${id}`);
+    return response.data;
+  }
+
+  async searchBookings(params: {
+    keyword?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    status?: string;
+    sort?: 'newest' | 'oldest' | 'price_low' | 'price_high';
+  }) {
+    const response = await this.client.get('/bookings/search', { params });
+    return response.data;
+  }
+
+  async updateBooking(id: string, data: Record<string, unknown>) {
+    const response = await this.client.patch(`/bookings/${id}`, data);
     return response.data;
   }
 
@@ -212,6 +263,12 @@ class ApiClient {
     return response.data;
   }
 
+  /** 켜져 있는 수집원별 마지막 수집 결과 */
+  async getLatestCrawls(): Promise<LatestCrawl[]> {
+    const response = await this.client.get('/crawler-monitoring/latest');
+    return response.data;
+  }
+
   async triggerCrawler() {
     const response = await this.client.post('/jobs/crawler/trigger');
     return response.data;
@@ -223,4 +280,7 @@ class ApiClient {
   }
 }
 
-export const apiClient = new ApiClient();
+/** 서버 ApiClient의 공개 메서드 전부. 정적 모드 클라이언트도 이것을 빠짐없이 구현해야 한다. */
+export type ApiClientContract = { [K in keyof ApiClient]: ApiClient[K] };
+
+export const apiClient: ApiClientContract = STATIC_MODE ? new LocalApiClient() : new ApiClient();

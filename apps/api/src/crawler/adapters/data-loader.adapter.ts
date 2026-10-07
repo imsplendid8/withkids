@@ -4,13 +4,18 @@ import { BaseAdapter } from './base.adapter';
 import * as fs from 'fs';
 import * as path from 'path';
 
+type RawProgram = Record<string, unknown>;
+
+const BOOKING_METHODS: ExperienceData['bookingMethod'][] = ['FIRST_COME', 'LOTTERY', 'ALWAYS_AVAILABLE'];
+const STATUSES: ExperienceData['status'][] = ['OPENING_SOON', 'OPEN', 'CLOSED', 'UNKNOWN'];
+
 /**
  * DataLoader Adapter - Import programs from JSON/CSV files
  * Supports loading experience data from local files for batch imports
  */
 @Injectable()
 export class DataLoaderAdapter extends BaseAdapter {
-  private dataDir = path.join(process.cwd(), 'apps/api/src/crawler/data');
+  private dataDir = path.resolve(__dirname, '../data');
 
   constructor() {
     super('data-loader', 'file://', CrawlSchedule.DAILY);
@@ -67,44 +72,49 @@ export class DataLoaderAdapter extends BaseAdapter {
     }
   }
 
-  private isValidProgram(program: any): boolean {
-    return (
-      program &&
-      typeof program === 'object' &&
-      program.externalId &&
-      program.institutionName &&
-      program.programName &&
-      program.bookingMethod &&
-      program.status
+  private isValidProgram(program: unknown): program is RawProgram {
+    if (!program || typeof program !== 'object') return false;
+    const p = program as RawProgram;
+    return Boolean(
+      p.externalId &&
+        p.institutionName &&
+        p.programName &&
+        BOOKING_METHODS.includes(p.bookingMethod as ExperienceData['bookingMethod']) &&
+        STATUSES.includes(p.status as ExperienceData['status']),
     );
   }
 
-  private normalizeProgram(program: any): ExperienceData {
+  private normalizeProgram(program: RawProgram): ExperienceData {
+    const text = (value: unknown) => (value ? String(value) : undefined);
+    const date = (value: unknown) => (value ? new Date(String(value)) : undefined);
+
     return {
       externalId: String(program.externalId),
       institutionName: String(program.institutionName),
       programName: String(program.programName),
-      description: program.description ? String(program.description) : undefined,
-      programUrl: program.programUrl ? String(program.programUrl) : undefined,
-      bookingUrl: program.bookingUrl ? String(program.bookingUrl) : undefined,
-      experienceDate: program.experienceDate ? new Date(program.experienceDate) : undefined,
-      bookingOpenAt: program.bookingOpenAt ? new Date(program.bookingOpenAt) : undefined,
-      bookingCloseAt: program.bookingCloseAt ? new Date(program.bookingCloseAt) : undefined,
+      description: text(program.description),
+      programUrl: text(program.programUrl),
+      bookingUrl: text(program.bookingUrl),
+      experienceDate: date(program.experienceDate),
+      bookingOpenAt: date(program.bookingOpenAt),
+      bookingCloseAt: date(program.bookingCloseAt),
       capacity: program.capacity ? Number(program.capacity) : undefined,
-      price: program.price ? this.parsePriceValue(program.price) : 0,
-      ageGroup: program.ageGroup ? String(program.ageGroup) : undefined,
-      bookingMethod: program.bookingMethod,
-      status: program.status,
-      externalSource: program.externalSource || 'data-loader',
+      // 값이 없으면 "무료"가 아니라 "모름"이다. 0으로 채우면 유료 프로그램이 무료로 보인다.
+      price: this.parsePriceValue(program.price),
+      ageGroup: text(program.ageGroup),
+      bookingMethod: program.bookingMethod as ExperienceData['bookingMethod'],
+      status: program.status as ExperienceData['status'],
+      externalSource: text(program.externalSource) ?? 'data-loader',
     };
   }
 
-  private parsePriceValue(price: any): number {
-    if (price === null || price === undefined) return 0;
-    if (typeof price === 'string') {
-      const parsed = parseInt(price.replace(/[^0-9]/g, ''));
-      return isNaN(parsed) ? 0 : parsed;
+  private parsePriceValue(price: unknown): number | undefined {
+    if (typeof price === 'number') return Number.isFinite(price) ? price : undefined;
+    if (typeof price === 'string' && price.trim() !== '') {
+      if (price.includes('무료')) return 0;
+      const parsed = parseInt(price.replace(/[^0-9]/g, ''), 10);
+      return Number.isNaN(parsed) ? undefined : parsed;
     }
-    return typeof price === 'number' ? price : 0;
+    return undefined;
   }
 }

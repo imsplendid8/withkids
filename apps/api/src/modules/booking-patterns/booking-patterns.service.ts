@@ -1,10 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Between, MoreThanOrEqual, Repository } from 'typeorm';
 import { BookingPattern, PatternType } from './entities/booking-pattern.entity';
 import { PatternEvidence } from './entities/pattern-evidence.entity';
 import { BookingPrediction } from './entities/booking-prediction.entity';
-import { ExperienceRun } from '@/modules/experience-runs/experience-runs.entity';
 
 @Injectable()
 export class BookingPatternsService {
@@ -118,12 +117,7 @@ export class BookingPatternsService {
 
   async getHighConfidencePatterns(threshold: number = 0.7): Promise<BookingPattern[]> {
     return this.bookingPatternsRepository.find({
-      where: {
-        confidence: (() => {
-          const query = this.bookingPatternsRepository.createQueryBuilder();
-          return threshold; // Placeholder - actual comparison in queryBuilder
-        })() as any,
-      },
+      where: { confidence: MoreThanOrEqual(threshold) },
       order: { confidence: 'DESC' },
     });
   }
@@ -171,13 +165,13 @@ export class BookingPatternsService {
     const now = new Date();
     const qb = this.bookingPredictionsRepository
       .createQueryBuilder('p')
-      .where('p.experience_id = :experienceId', { experienceId });
+      .where('p.experienceId = :experienceId', { experienceId });
 
     if (!includeExpired) {
-      qb.andWhere('(p.expires_at IS NULL OR p.expires_at > :now)', { now });
+      qb.andWhere('(p.expiresAt IS NULL OR p.expiresAt > :now)', { now });
     }
 
-    return qb.orderBy('p.predicted_booking_open_at', 'ASC').getMany();
+    return qb.orderBy('p.predictedBookingOpenAt', 'ASC').getMany();
   }
 
   async getUpcomingPredictions(
@@ -187,9 +181,7 @@ export class BookingPatternsService {
     const future = new Date(now.getTime() + hoursAhead * 60 * 60 * 1000);
 
     return this.bookingPredictionsRepository.find({
-      where: {
-        predictedBookingOpenAt: (() => now as any)(),
-      },
+      where: { predictedBookingOpenAt: Between(now, future) },
       order: { predictedBookingOpenAt: 'ASC' },
     });
   }
@@ -221,10 +213,10 @@ export class BookingPatternsService {
     return this.bookingPredictionsRepository
       .createQueryBuilder('p')
       .where('p.confidence >= :threshold', { threshold })
-      .andWhere('(p.expires_at IS NULL OR p.expires_at > :now)', { now })
-      .andWhere('p.verified_at IS NULL')
+      .andWhere('(p.expiresAt IS NULL OR p.expiresAt > :now)', { now })
+      .andWhere('p.verifiedAt IS NULL')
       .orderBy('p.confidence', 'DESC')
-      .addOrderBy('p.predicted_booking_open_at', 'ASC')
+      .addOrderBy('p.predictedBookingOpenAt', 'ASC')
       .take(limit)
       .getMany();
   }

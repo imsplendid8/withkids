@@ -55,7 +55,7 @@ src/
 ├── crawler/
 │   ├── adapter.interface.ts       # Adapter 인터페이스
 │   ├── adapters/
-│   │   └── mock.adapter.ts        # Mock 데이터 adapter
+│   │   └── seoul-public-service.adapter.ts  # 서울 공공서비스예약 API
 │   ├── entities/
 │   │   ├── crawl-history.entity.ts
 │   │   └── adapter-state.entity.ts

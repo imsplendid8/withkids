@@ -3,26 +3,29 @@ import { useRouter } from 'next/router';
 import { useAuthStore } from '@/store/authStore';
 import { apiClient } from '@/lib/api';
 import { MainLayout } from '@/components/layouts/MainLayout';
+import { DataBackupCard } from '@/components/DataBackupCard';
+import { ChildrenCard } from '@/components/ChildrenCard';
+import { STATIC_MODE } from '@/lib/staticMode';
 import { FiEdit2, FiSave, FiX, FiLock } from 'react-icons/fi';
 
 export default function ProfilePage() {
   const router = useRouter();
   const { user, isLoading, isAuthenticated, setUser } = useAuthStore();
   const [isEditing, setIsEditing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'profile' | 'children' | 'notifications' | 'password'>('profile');
+  const [activeTab, setActiveTab] = useState<
+    'profile' | 'children' | 'notifications' | 'password' | 'backup'
+  >('profile');
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [formData, setFormData] = useState({
     profileName: '',
     email: '',
   });
-  const [children, setChildren] = useState<Array<{ id: string; age: number }>>([]);
   const [password, setPassword] = useState({
     current: '',
     new: '',
     confirm: '',
   });
-  const [newChildAge, setNewChildAge] = useState<number>(6);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -36,15 +39,6 @@ export default function ProfilePage() {
         profileName: user.profileName || '',
         email: user.email || '',
       });
-      // Initialize children from user data or empty array
-      if (user.childrenAges && Array.isArray(user.childrenAges)) {
-        setChildren(
-          user.childrenAges.map((age: number, idx: number) => ({
-            id: `child-${idx}`,
-            age,
-          }))
-        );
-      }
     }
   }, [user]);
 
@@ -60,7 +54,7 @@ export default function ProfilePage() {
     try {
       setIsSaving(true);
       setMessage(null);
-      const childrenAges = children.map((c) => c.age);
+      const childrenAges = user?.childrenAges ?? [];
       await apiClient.updateProfile(formData.profileName, childrenAges);
       setMessage({ type: 'success', text: '프로필이 저장되었습니다.' });
       setIsEditing(false);
@@ -81,14 +75,6 @@ export default function ProfilePage() {
         profileName: user.profileName || '',
         email: user.email || '',
       });
-      if (user.childrenAges && Array.isArray(user.childrenAges)) {
-        setChildren(
-          user.childrenAges.map((age: number, idx: number) => ({
-            id: `child-${idx}`,
-            age,
-          }))
-        );
-      }
     }
     setIsEditing(false);
   };
@@ -119,7 +105,10 @@ export default function ProfilePage() {
 
         {/* Tabs */}
         <div className="flex gap-2 border-b border-gray-200">
-          {(['profile', 'children', 'notifications', 'password'] as const).map((tab) => (
+          {/* 로그인이 없는 정적 배포에서는 비밀번호 대신 백업 탭 */}
+          {(
+            ['profile', 'children', 'notifications', STATIC_MODE ? 'backup' : 'password'] as const
+          ).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -133,6 +122,7 @@ export default function ProfilePage() {
               {tab === 'children' && '자녀'}
               {tab === 'notifications' && '알림'}
               {tab === 'password' && '비밀번호'}
+              {tab === 'backup' && '백업'}
             </button>
           ))}
         </div>
@@ -151,17 +141,15 @@ export default function ProfilePage() {
                       <p className="text-lg text-gray-900">{formData.profileName}</p>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        이메일
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">이메일</label>
                       <p className="text-lg text-gray-900">{formData.email}</p>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        가입일
-                      </label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">가입일</label>
                       <p className="text-lg text-gray-900">
-                        {user?.createdAt ? new Date(user.createdAt).toLocaleDateString('ko-KR') : '-'}
+                        {user?.createdAt
+                          ? new Date(user.createdAt).toLocaleDateString('ko-KR')
+                          : '-'}
                       </p>
                     </div>
                   </div>
@@ -184,16 +172,12 @@ export default function ProfilePage() {
                     <input
                       type="text"
                       value={formData.profileName}
-                      onChange={(e) =>
-                        setFormData({ ...formData, profileName: e.target.value })
-                      }
+                      onChange={(e) => setFormData({ ...formData, profileName: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      이메일
-                    </label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">이메일</label>
                     <input
                       type="email"
                       value={formData.email}
@@ -226,80 +210,7 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Children Tab */}
-        {activeTab === 'children' && (
-          <div className="bg-white rounded-lg shadow p-6 space-y-4">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">자녀 나이 정보</h3>
-              {children.length > 0 ? (
-                <div className="space-y-3 mb-4">
-                  {children.map((child, i) => (
-                    <div
-                      key={child.id}
-                      className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
-                    >
-                      <div>
-                        <p className="font-medium text-gray-900">자녀 {i + 1}</p>
-                        <p className="text-sm text-gray-600">{child.age}세</p>
-                      </div>
-                      <button
-                        onClick={() => {
-                          setChildren(children.filter((_, idx) => idx !== i));
-                        }}
-                        className="px-3 py-1 text-sm border border-red-300 text-red-600 rounded hover:bg-red-50"
-                      >
-                        제거
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-gray-600 text-sm mb-4">등록된 자녀가 없습니다.</p>
-              )}
-
-              {/* Add Child Section */}
-              <div className="border-t border-gray-200 pt-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  자녀 추가 (나이)
-                </label>
-                <div className="flex gap-2">
-                  <select
-                    value={newChildAge}
-                    onChange={(e) => setNewChildAge(parseInt(e.target.value))}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    {Array.from({ length: 16 }, (_, i) => i + 3).map((age) => (
-                      <option key={age} value={age}>
-                        {age}세
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={() => {
-                      setChildren([...children, { id: `child-${Date.now()}`, age: newChildAge }]);
-                      setNewChildAge(6);
-                    }}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                  >
-                    추가
-                  </button>
-                </div>
-              </div>
-
-              {/* Save Button */}
-              <div className="flex gap-2 pt-4 border-t border-gray-200 mt-4">
-                <button
-                  onClick={handleSaveProfile}
-                  disabled={isSaving}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
-                >
-                  <FiSave size={18} />
-                  {isSaving ? '저장 중...' : '저장'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {activeTab === 'children' && <ChildrenCard />}
 
         {/* Notifications Tab */}
         {activeTab === 'notifications' && (
@@ -308,11 +219,18 @@ export default function ProfilePage() {
             <div className="space-y-4">
               {[
                 { id: 'booking', label: '예약 관련 알림', description: '예약 확인, 취소 등' },
-                { id: 'new_program', label: '신규 프로그램 알림', description: '관심 분야 신규 프로그램' },
+                {
+                  id: 'new_program',
+                  label: '신규 프로그램 알림',
+                  description: '관심 분야 신규 프로그램',
+                },
                 { id: 'reminder', label: '일정 미리알림', description: '예정된 프로그램 상기' },
                 { id: 'email', label: '이메일 알림', description: '이메일을 통한 알림' },
               ].map((item) => (
-                <div key={item.id} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between p-4 border border-gray-200 rounded-lg"
+                >
                   <div>
                     <p className="font-medium text-gray-900">{item.label}</p>
                     <p className="text-sm text-gray-600">{item.description}</p>
@@ -346,9 +264,7 @@ export default function ProfilePage() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  새 비밀번호
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">새 비밀번호</label>
                 <input
                   type="password"
                   value={password.new}
@@ -374,6 +290,8 @@ export default function ProfilePage() {
             </div>
           </div>
         )}
+
+        {activeTab === 'backup' && <DataBackupCard />}
       </div>
     </MainLayout>
   );

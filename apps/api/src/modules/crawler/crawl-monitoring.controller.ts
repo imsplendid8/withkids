@@ -1,13 +1,30 @@
-import { Controller, Get, Param, Query, Patch } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
+import { Controller, Get, Param, Query, Patch, UseGuards } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiQuery, ApiBearerAuth } from '@nestjs/swagger';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CrawlMonitoringService } from './crawl-monitoring.service';
 import { CrawlHistory } from './entities/crawl-history.entity';
 import { AdapterState } from './entities/adapter-state.entity';
+import { CrawlerService } from '@/crawler/crawler.service';
 
 @ApiTags('Crawler Monitoring')
+@ApiBearerAuth()
+@UseGuards(JwtAuthGuard)
 @Controller('api/crawler-monitoring')
 export class CrawlMonitoringController {
-  constructor(private crawlMonitoringService: CrawlMonitoringService) {}
+  constructor(
+    private crawlMonitoringService: CrawlMonitoringService,
+    private crawlerService: CrawlerService,
+  ) {}
+
+  @Get('latest')
+  @ApiOperation({ summary: '켜져 있는 수집원별 마지막 수집 결과' })
+  async getLatest() {
+    const enabled = this.crawlerService
+      .getAdapters()
+      .filter((adapter) => adapter.enabled)
+      .map((adapter) => adapter.name);
+    return this.crawlMonitoringService.getLatestCrawls(enabled);
+  }
 
   @Get('history/:adapterName')
   @ApiOperation({ summary: 'Get crawl history for an adapter' })

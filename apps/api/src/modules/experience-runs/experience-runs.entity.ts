@@ -39,8 +39,8 @@ export class ExperienceRun {
   bookingCloseAt: Date;
 
   @Column({
-    type: 'enum',
-    enum: ['FIRST_COME', 'LOTTERY', 'ALWAYS_AVAILABLE'],
+    type: 'varchar',
+    length: 50,
   })
   bookingMethod: string;
 
@@ -50,19 +50,20 @@ export class ExperienceRun {
   @Column({ type: 'int', nullable: true })
   capacityRemaining: number;
 
-  @Column({ type: 'int', default: 0 })
-  price: number;
+  /** 무료는 0, 유료지만 금액을 알 수 없으면 null (서울 오픈API는 유료/무료만 제공) */
+  @Column({ type: 'int', nullable: true })
+  price: number | null;
 
   @Column({
-    type: 'enum',
-    enum: ['UNKNOWN', 'OPENING_SOON', 'OPEN', 'CLOSED', 'CANCELLED'],
+    type: 'varchar',
+    length: 50,
     default: 'UNKNOWN',
   })
   status: string;
 
   @Column({
-    type: 'enum',
-    enum: ['AVAILABLE', 'CAPTCHA_REQUIRED', 'QUEUE_REQUIRED', 'MANUAL_REQUIRED'],
+    type: 'varchar',
+    length: 50,
   })
   automationStatus: string;
 

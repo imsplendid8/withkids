@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { JwtService } from '@nestjs/jwt';
-import { UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, UnauthorizedException } from '@nestjs/common';
+import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
 
@@ -12,9 +13,11 @@ describe('AuthService', () => {
   beforeEach(async () => {
     mockUsersService = {
       createUser: jest.fn(),
+      createUserWithPassword: jest.fn(),
       getUserById: jest.fn(),
       getUserByEmail: jest.fn(),
       updateUserPassword: jest.fn(),
+      countUsers: jest.fn().mockResolvedValue(0),
     };
 
     mockJwtService = {
@@ -57,20 +60,60 @@ describe('AuthService', () => {
         profileName: userData.profileName,
       };
 
-      mockUsersService.createUser.mockResolvedValue(createdUser);
-      mockUsersService.updateUserPassword.mockResolvedValue(undefined);
+      mockUsersService.createUserWithPassword.mockResolvedValue(createdUser);
       mockJwtService.sign.mockReturnValue('mocked-access-token');
 
       const result = await service.register(
         userData.email,
         userData.password,
-        userData.profileName,
+        userData.profileName
       );
 
       expect(result.userId).toBe('user-1');
       expect(result.email).toBe(userData.email);
       expect(result.accessToken).toBe('mocked-access-token');
-      expect(mockUsersService.updateUserPassword).toHaveBeenCalled();
+      const [, savedHash, savedName] = mockUsersService.createUserWithPassword.mock.calls[0];
+      expect(savedHash).not.toBe(userData.password);
+      expect(await bcrypt.compare(userData.password, savedHash)).toBe(true);
+      expect(savedName).toBe(userData.profileName);
+    });
+
+    it('계정이 이미 있으면 가입을 막는다', async () => {
+      mockUsersService.countUsers.mockResolvedValue(1);
+
+      await expect(service.register('intruder@example.com', 'Password123')).rejects.toThrow(
+        ForbiddenException
+      );
+      expect(mockUsersService.createUserWithPassword).not.toHaveBeenCalled();
+    });
+
+    it('ALLOW_REGISTRATION=true 이면 계정이 있어도 가입을 받는다', async () => {
+      const previous = process.env.ALLOW_REGISTRATION;
+      process.env.ALLOW_REGISTRATION = 'true';
+      try {
+        mockUsersService.countUsers.mockResolvedValue(3);
+        mockUsersService.createUserWithPassword.mockResolvedValue({
+          id: 'user-2',
+          email: 'second@example.com',
+        });
+        mockJwtService.sign.mockReturnValue('token');
+
+        await expect(service.register('second@example.com', 'Password123')).resolves.toMatchObject({
+          userId: 'user-2',
+        });
+      } finally {
+        if (previous === undefined) delete process.env.ALLOW_REGISTRATION;
+        else process.env.ALLOW_REGISTRATION = previous;
+      }
+    });
+  });
+
+  describe('needsSetup', () => {
+    it('계정이 없을 때만 true', async () => {
+      mockUsersService.countUsers.mockResolvedValueOnce(0).mockResolvedValueOnce(1);
+
+      await expect(service.needsSetup()).resolves.toBe(true);
+      await expect(service.needsSetup()).resolves.toBe(false);
     });
   });
 
@@ -79,7 +122,7 @@ describe('AuthService', () => {
       const mockUser: any = {
         id: 'user-1',
         email: 'test@example.com',
-        passwordHash: '$2b$10$hashed.password.here',
+        passwordHash: await bcrypt.hash('SomePassword123', 4),
       };
 
       mockUsersService.getUserByEmail.mockResolvedValue(mockUser);
@@ -92,12 +135,24 @@ describe('AuthService', () => {
       expect(result.expiresIn).toBe(86400);
     });
 
+    it('should throw UnauthorizedException on wrong password', async () => {
+      mockUsersService.getUserByEmail.mockResolvedValue({
+        id: 'user-1',
+        email: 'test@example.com',
+        passwordHash: await bcrypt.hash('SomePassword123', 4),
+      });
+
+      await expect(service.login('test@example.com', 'WrongPassword')).rejects.toThrow(
+        UnauthorizedException
+      );
+    });
+
     it('should throw UnauthorizedException on invalid email', async () => {
       mockUsersService.getUserByEmail.mockResolvedValue(null);
 
-      await expect(
-        service.login('nonexistent@example.com', 'password'),
-      ).rejects.toThrow(UnauthorizedException);
+      await expect(service.login('nonexistent@example.com', 'password')).rejects.toThrow(
+        UnauthorizedException
+      );
     });
 
     it('should throw UnauthorizedException if password is not set', async () => {
@@ -109,9 +164,9 @@ describe('AuthService', () => {
 
       mockUsersService.getUserByEmail.mockResolvedValue(mockUser);
 
-      await expect(
-        service.login('test@example.com', 'SomePassword123'),
-      ).rejects.toThrow(UnauthorizedException);
+      await expect(service.login('test@example.com', 'SomePassword123')).rejects.toThrow(
+        UnauthorizedException
+      );
     });
   });
 
@@ -134,9 +189,7 @@ describe('AuthService', () => {
     it('should throw UnauthorizedException on invalid token', async () => {
       mockJwtService.verifyAsync.mockRejectedValue(new Error('Invalid token'));
 
-      await expect(service.validateToken('invalid-token')).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(service.validateToken('invalid-token')).rejects.toThrow(UnauthorizedException);
     });
   });
 
@@ -145,7 +198,7 @@ describe('AuthService', () => {
       const mockUser: any = {
         id: 'user-1',
         email: 'test@example.com',
-        passwordHash: '$2b$10$old.password.hash',
+        passwordHash: await bcrypt.hash('OldPassword123', 4),
       };
 
       mockUsersService.getUserById.mockResolvedValue(mockUser);
@@ -153,14 +206,29 @@ describe('AuthService', () => {
 
       await service.changePassword('user-1', 'OldPassword123', 'NewPassword456');
 
-      expect(mockUsersService.updateUserPassword).toHaveBeenCalled();
+      const [userId, newHash] = mockUsersService.updateUserPassword.mock.calls[0];
+      expect(userId).toBe('user-1');
+      expect(await bcrypt.compare('NewPassword456', newHash)).toBe(true);
+    });
+
+    it('should reject when the current password is wrong', async () => {
+      mockUsersService.getUserById.mockResolvedValue({
+        id: 'user-1',
+        email: 'test@example.com',
+        passwordHash: await bcrypt.hash('OldPassword123', 4),
+      });
+
+      await expect(
+        service.changePassword('user-1', 'NotMyPassword', 'NewPassword456')
+      ).rejects.toThrow(UnauthorizedException);
+      expect(mockUsersService.updateUserPassword).not.toHaveBeenCalled();
     });
 
     it('should throw UnauthorizedException if user not found', async () => {
       mockUsersService.getUserById.mockResolvedValue(null);
 
       await expect(
-        service.changePassword('user-1', 'OldPassword123', 'NewPassword456'),
+        service.changePassword('user-1', 'OldPassword123', 'NewPassword456')
       ).rejects.toThrow(UnauthorizedException);
     });
   });
@@ -184,9 +252,9 @@ describe('AuthService', () => {
     it('should throw UnauthorizedException for non-existent email', async () => {
       mockUsersService.getUserByEmail.mockResolvedValue(null);
 
-      await expect(
-        service.resetPasswordRequest('nonexistent@example.com'),
-      ).rejects.toThrow(UnauthorizedException);
+      await expect(service.resetPasswordRequest('nonexistent@example.com')).rejects.toThrow(
+        UnauthorizedException
+      );
     });
   });
 });

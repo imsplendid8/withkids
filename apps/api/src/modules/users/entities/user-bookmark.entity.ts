@@ -41,8 +41,8 @@ export class UserBookmark {
   experienceRun: ExperienceRun;
 
   @Column({
-    type: 'enum',
-    enum: BookmarkType,
+    type: 'varchar',
+    length: 50,
   })
   bookmarkType: BookmarkType;
 
