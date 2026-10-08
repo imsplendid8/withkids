@@ -5,6 +5,7 @@ import {
   mapTourItem,
   mergeFestivals,
   normalizeServiceKey,
+  tourRegion,
   type Festival,
 } from './festivals';
 
@@ -108,14 +109,17 @@ describe('festivals', () => {
     ]);
   });
 
-  it('관광공사 응답을 지역마다 받아 합친다', async () => {
-    const get = jest.fn(async (_url: string, params?: Record<string, string | number>) => ({
+  it('관광공사 전국 축제 중 서울·인천·경기만 남긴다', async () => {
+    const busan = {
+      ...tourItem,
+      contentid: '9',
+      title: '부산불꽃축제',
+      addr1: '부산광역시 수영구',
+    };
+    const get = jest.fn(async () => ({
       response: {
         header: { resultCode: '0000', resultMsg: 'OK' },
-        body: {
-          totalCount: params?.areaCode === 31 ? 1 : 0,
-          items: params?.areaCode === 31 ? { item: [tourItem] } : '',
-        },
+        body: { totalCount: 2, items: { item: [tourItem, busan] } },
       },
     }));
     const result = await collectFestivals(
@@ -123,7 +127,16 @@ describe('festivals', () => {
       new Date('2026-10-01T00:00:00+09:00'),
       get
     );
-    expect(get).toHaveBeenCalledTimes(3);
+    expect(get).toHaveBeenCalledTimes(1);
     expect(result.festivals.map((f) => f.title)).toEqual(['수원화성문화제']);
+    expect(result.festivals[0]).toMatchObject({ region: '경기', district: '수원시' });
+  });
+
+  it('주소로 지역을 고른다', () => {
+    expect(tourRegion({ addr1: '서울특별시 마포구' })).toBe('서울');
+    expect(tourRegion({ addr1: '인천광역시 강화군' })).toBe('인천');
+    expect(tourRegion({ addr1: '경기도 가평군' })).toBe('경기');
+    expect(tourRegion({ addr1: '', areacode: '31' })).toBe('경기');
+    expect(tourRegion({ addr1: '강원특별자치도 춘천시' })).toBeNull();
   });
 });
