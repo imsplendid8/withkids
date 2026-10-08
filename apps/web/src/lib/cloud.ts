@@ -85,6 +85,38 @@ let currentUid: string | null = null;
 let pushTimer: ReturnType<typeof setTimeout> | null = null;
 let hookInstalled = false;
 let suppressHook = false;
+let pushesInFlight = 0;
+let unsubscribeRemote: (() => void) | null = null;
+
+/** 키 순서와 상관없이 같은 데이터면 같은 문자열 */
+export function storeFingerprint(data: Record<string, string>): string {
+  return JSON.stringify(
+    Object.keys(data)
+      .sort()
+      .map((key) => [key, data[key]])
+  );
+}
+
+/**
+ * 계정 데이터로 바꾼 뒤 화면을 새로 연다. 찜·아이 목록 등은 페이지가 처음 열릴 때 읽어 메모리에 들고 있어서,
+ * 그대로 두면 옛 목록에 하나를 더해 저장하면서 다른 기기에서 바꾼 내용을 덮어쓴다.
+ */
+let reloadPage = () => window.location.reload();
+export function setReloadHandlerForTest(handler: () => void) {
+  reloadPage = handler;
+}
+
+function applyRemote(remote: Record<string, string>): boolean {
+  if (storeFingerprint(remote) === storeFingerprint(snapshotLocal(window.localStorage)))
+    return false;
+  suppressHook = true;
+  try {
+    restoreLocal(window.localStorage, remote);
+  } finally {
+    suppressHook = false;
+  }
+  return true;
+}
 
 async function connect() {
   if (!started) {
@@ -104,20 +136,29 @@ async function connect() {
 async function pushNow(): Promise<void> {
   if (!currentUid) return;
   const uid = currentUid;
-  const { db } = await connect();
-  const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
-  await setDoc(doc(db, 'users', uid), {
-    store: snapshotLocal(window.localStorage),
-    updatedAt: serverTimestamp(),
-  });
+  pushesInFlight++;
+  try {
+    const { db } = await connect();
+    const { doc, setDoc, serverTimestamp } = await import('firebase/firestore');
+    await setDoc(doc(db, 'users', uid), {
+      store: snapshotLocal(window.localStorage),
+      updatedAt: serverTimestamp(),
+    });
+  } finally {
+    pushesInFlight--;
+  }
 }
 
-function schedulePush() {
+/** 실패하면 연결이 돌아올 때까지 잠시 뒤 다시 올린다 */
+function schedulePush(delay = 800) {
   if (pushTimer) clearTimeout(pushTimer);
   pushTimer = setTimeout(() => {
     pushTimer = null;
-    pushNow().catch((error) => console.error('계정에 저장하지 못했습니다:', error));
-  }, 800);
+    pushNow().catch((error) => {
+      console.error('계정에 저장하지 못했습니다. 잠시 뒤 다시 시도합니다:', error);
+      if (currentUid && !pushTimer) schedulePush(10000);
+    });
+  }, delay);
 }
 
 /** localStorage에 쓰면 계정에도 올린다 */
@@ -139,7 +180,8 @@ function installWriteHook() {
   };
 }
 
-async function pullOrSeed(uid: string): Promise<void> {
+/** 계정 데이터를 가져온다. 이 브라우저 데이터가 바뀌었으면 true */
+async function pullOrSeed(uid: string): Promise<boolean> {
   const { db } = await connect();
   const { doc, getDoc } = await import('firebase/firestore');
   const snapshot = await getDoc(doc(db, 'users', uid));
@@ -147,13 +189,9 @@ async function pullOrSeed(uid: string): Promise<void> {
     ? (snapshot.data().store as Record<string, string> | undefined)
     : undefined;
   if (remote) {
-    suppressHook = true;
-    try {
-      restoreLocal(window.localStorage, remote);
-    } finally {
-      suppressHook = false;
-    }
+    const changed = applyRemote(remote);
     currentUid = uid;
+    return changed;
   } else {
     // 처음 로그인: 지금 이 브라우저에 있던 데이터를 계정으로 옮긴다
     currentUid = uid;
@@ -163,7 +201,30 @@ async function pullOrSeed(uid: string): Promise<void> {
       currentUid = null;
       throw error;
     }
+    return false;
   }
+}
+
+/** 다른 기기에서 저장하면 이 화면에도 반영한다 (이 기기에 아직 안 올린 변경이 있으면 기다린다) */
+async function watchRemote(uid: string): Promise<void> {
+  unsubscribeRemote?.();
+  const { db } = await connect();
+  const { doc, onSnapshot } = await import('firebase/firestore');
+  unsubscribeRemote = onSnapshot(
+    doc(db, 'users', uid),
+    (snapshot) => {
+      if (currentUid !== uid || snapshot.metadata.hasPendingWrites) return;
+      if (pushTimer || pushesInFlight > 0) return;
+      const remote = snapshot.data()?.store as Record<string, string> | undefined;
+      if (remote && applyRemote(remote)) reloadPage();
+    },
+    (error) => console.error('다른 기기의 변경을 받지 못했습니다:', error)
+  );
+}
+
+function stopWatchingRemote() {
+  unsubscribeRemote?.();
+  unsubscribeRemote = null;
 }
 
 export const PULL_FAILED_MESSAGE =
@@ -186,11 +247,13 @@ export async function watchCloudUser(
   onAuthStateChanged(auth, async (user) => {
     if (!user) {
       currentUid = null;
+      stopWatchingRemote();
       onChange(null);
       return;
     }
+    let changed = false;
     try {
-      await pullOrSeed(user.uid);
+      changed = await pullOrSeed(user.uid);
     } catch (error) {
       console.error('계정 데이터를 가져오지 못했습니다:', error);
       currentUid = null;
@@ -199,7 +262,26 @@ export async function watchCloudUser(
       await signOut(auth).catch(() => undefined);
       return;
     }
+    // 이미 열린 페이지가 옛 데이터를 들고 있으면 새로 연다 (로그인 화면은 곧 다른 페이지로 넘어가므로 제외)
+    if (
+      changed &&
+      !window.location.pathname.endsWith('/login') &&
+      !window.location.pathname.endsWith('/login/')
+    ) {
+      reloadPage();
+      return;
+    }
+    watchRemote(user.uid).catch((error) =>
+      console.error('실시간 동기화를 시작하지 못했습니다:', error)
+    );
     onChange({ uid: user.uid, email: user.email ?? '', displayName: user.displayName ?? '' });
+  });
+  // 창을 닫기 직전 아직 안 올린 변경이 있으면 바로 올려 본다
+  window.addEventListener('pagehide', () => {
+    if (!pushTimer) return;
+    clearTimeout(pushTimer);
+    pushTimer = null;
+    pushNow().catch(() => undefined);
   });
 }
 
@@ -244,6 +326,7 @@ export async function signOutCloud(): Promise<void> {
   const { auth } = await connect();
   const { signOut } = await import('firebase/auth');
   currentUid = null;
+  stopWatchingRemote();
   await signOut(auth);
   suppressHook = true;
   try {
