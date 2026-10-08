@@ -1,5 +1,7 @@
 # better-sqlite3 13은 Node 22 이상이 필요하다 (20에서는 컴파일하다 실패)
 FROM node:22-alpine AS base
+# 미리 빌드된 파일을 못 받으면 better-sqlite3를 직접 컴파일한다
+RUN apk add --no-cache python3 make g++
 WORKDIR /app
 
 # 의존성 설치 (워크스페이스 루트 기준)
@@ -10,8 +12,8 @@ RUN npm ci
 
 # 빌드
 FROM base AS builder
-COPY package*.json ./
-COPY --from=deps /app/node_modules ./node_modules
+# 워크스페이스 안쪽(apps/*/node_modules)에 깔린 패키지도 함께 가져온다
+COPY --from=deps /app ./
 COPY apps/api/ ./apps/api/
 RUN npm run build --workspace=apps/api
 
