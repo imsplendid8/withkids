@@ -155,11 +155,17 @@ export async function fetchSeoulFestivals(
 
 // ── 한국관광공사 TourAPI ────────────────────────────────────
 
-const TOUR_AREAS: Array<{ code: number; region: FestivalRegion }> = [
-  { code: 1, region: '서울' },
-  { code: 2, region: '인천' },
-  { code: 31, region: '경기' },
-];
+/**
+ * 지역은 주소로 고른다. searchFestival2에 areaCode를 넣으면 결과가 0건으로 오는 경우가 있어
+ * 전국을 받아 서울·인천·경기만 남긴다.
+ */
+export function tourRegion(item: { addr1?: string; areacode?: string }): FestivalRegion | null {
+  const addr = (item.addr1 ?? '').trim();
+  if (/^서울/.test(addr) || item.areacode === '1') return '서울';
+  if (/^인천/.test(addr) || item.areacode === '2') return '인천';
+  if (/^경기/.test(addr) || item.areacode === '31') return '경기';
+  return null;
+}
 
 interface TourItem {
   contentid?: string;
@@ -220,42 +226,41 @@ export async function fetchTourFestivals(
 ): Promise<Festival[]> {
   const serviceKey = normalizeServiceKey(apiKey);
   const festivals: Festival[] = [];
-  for (const area of TOUR_AREAS) {
-    for (let pageNo = 1; ; pageNo++) {
-      const data = (await get('https://apis.data.go.kr/B551011/KorService2/searchFestival2', {
-        serviceKey,
-        MobileOS: 'ETC',
-        MobileApp: 'WITHKIDS',
-        _type: 'json',
-        numOfRows: 500,
-        pageNo,
-        arrange: 'A',
-        areaCode: area.code,
-        eventStartDate: toSeoulYmd(from).replace(/-/g, ''),
-      })) as {
-        response?: {
-          header?: { resultCode?: string; resultMsg?: string };
-          body?: { totalCount?: number; items?: { item?: TourItem[] | TourItem } | '' };
-        };
+  for (let pageNo = 1; pageNo <= 20; pageNo++) {
+    const data = (await get('https://apis.data.go.kr/B551011/KorService2/searchFestival2', {
+      serviceKey,
+      MobileOS: 'ETC',
+      MobileApp: 'WITHKIDS',
+      _type: 'json',
+      numOfRows: 500,
+      pageNo,
+      arrange: 'A',
+      eventStartDate: toSeoulYmd(from).replace(/-/g, ''),
+    })) as {
+      response?: {
+        header?: { resultCode?: string; resultMsg?: string };
+        body?: { totalCount?: number; items?: { item?: TourItem[] | TourItem } | '' };
       };
-      const header = data?.response?.header;
-      if (!data?.response || (header?.resultCode && header.resultCode !== '0000')) {
-        const raw =
-          typeof data === 'string'
-            ? (data as string).slice(0, 200)
-            : JSON.stringify(data).slice(0, 200);
-        throw new Error(
-          `관광공사 응답 오류: ${header?.resultCode ?? ''} ${header?.resultMsg ?? raw}`.trim()
-        );
-      }
-      const body = data.response.body;
-      const raw = body?.items && typeof body.items === 'object' ? body.items.item : [];
-      const items = Array.isArray(raw) ? raw : raw ? [raw] : [];
-      festivals.push(
-        ...items.map((i) => mapTourItem(i, area.region)).filter((f): f is Festival => f !== null)
+    };
+    const header = data?.response?.header;
+    if (!data?.response || (header?.resultCode && header.resultCode !== '0000')) {
+      const raw =
+        typeof data === 'string'
+          ? (data as string).slice(0, 200)
+          : JSON.stringify(data).slice(0, 200);
+      throw new Error(
+        `관광공사 응답 오류: ${header?.resultCode ?? ''} ${header?.resultMsg ?? raw}`.trim()
       );
-      if (items.length < 500 || pageNo * 500 >= (body?.totalCount ?? 0)) break;
     }
+    const body = data.response.body;
+    const raw = body?.items && typeof body.items === 'object' ? body.items.item : [];
+    const items = Array.isArray(raw) ? raw : raw ? [raw] : [];
+    for (const item of items) {
+      const region = tourRegion(item);
+      const festival = region ? mapTourItem(item, region) : null;
+      if (festival) festivals.push(festival);
+    }
+    if (items.length < 500 || pageNo * 500 >= (body?.totalCount ?? 0)) break;
   }
   return festivals;
 }

@@ -1,4 +1,5 @@
-FROM node:20-alpine AS base
+# better-sqlite3 13은 Node 22 이상이 필요하다 (20에서는 컴파일하다 실패)
+FROM node:22-alpine AS base
 WORKDIR /app
 
 # 의존성 설치 (워크스페이스 루트 기준)
