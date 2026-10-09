@@ -72,9 +72,9 @@ export default function DashboardPage() {
     <MainLayout>
       <div className="space-y-6">
         {/* 인사 */}
-        <section className="bg-gradient-to-r from-blue-500 to-indigo-600 rounded-lg shadow-lg p-6 md:p-8 text-white">
-          <p className="text-blue-100 text-sm">{formatMonthDay(today)}</p>
-          <h1 className="text-2xl md:text-3xl font-bold mt-1">
+        <section className="pt-1">
+          <p className="text-sm font-medium text-gray-500">{formatMonthDay(today)}</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mt-1">
             안녕하세요, {user?.profileName || '보호자'}님
           </h1>
         </section>

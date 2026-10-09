@@ -376,10 +376,10 @@ function Chip({
     <button
       onClick={onClick}
       aria-pressed={active}
-      className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+      className={`px-3.5 py-1.5 rounded-full text-sm font-medium ${
         active
-          ? 'border-blue-600 bg-blue-50 text-blue-700'
-          : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+          ? 'bg-blue-600 text-white'
+          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
       }`}
     >
       {children}

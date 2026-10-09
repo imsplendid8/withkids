@@ -81,7 +81,7 @@ export default function FestivalsPage() {
                 setRegion(r.value);
                 setDistrict('');
               }}
-              className={`px-4 py-2 rounded-full font-medium transition-colors ${
+              className={`px-3.5 py-1.5 rounded-full text-sm font-medium ${
                 region === r.value
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -98,10 +98,10 @@ export default function FestivalsPage() {
             <button
               key={p.value}
               onClick={() => setPeriod(p.value)}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+              className={`px-3.5 py-1.5 rounded-full text-sm font-medium ${
                 period === p.value
-                  ? 'border-blue-600 bg-blue-50 text-blue-700'
-                  : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
               {p.label}

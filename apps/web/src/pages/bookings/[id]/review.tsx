@@ -170,7 +170,7 @@ export default function BookingReviewPage() {
         {/* Program Info Card */}
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex gap-4">
-            <div className="w-24 h-24 rounded-lg bg-gradient-to-br from-blue-100 to-blue-50 flex items-center justify-center text-blue-400">
+            <div className="w-24 h-24 rounded-lg bg-gray-100 flex items-center justify-center text-gray-300">
               <svg width="80" height="80" viewBox="0 0 80 80" fill="currentColor">
                 <path d="M40 0C17.9 0 0 17.9 0 40s17.9 40 40 40 40-17.9 40-40S62.1 0 40 0zm0 72c-17.6 0-32-14.4-32-32s14.4-32 32-32 32 14.4 32 32-14.4 32-32 32z" />
               </svg>
