@@ -5,6 +5,7 @@ import { useAuthStore } from '@/store/authStore';
 import { apiClient } from '@/lib/api';
 import { initSentry, setUser, clearUser } from '@/lib/sentry';
 import { trackWebVitals } from '@/lib/performance';
+import { BASE_PATH } from '@/lib/staticMode';
 import '../styles/globals.css';
 
 // Initialize Sentry on mount
@@ -50,6 +51,12 @@ export default function App({ Component, pageProps }: AppProps) {
       <Head>
         <title>WITHKIDS</title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <link rel="icon" href={`${BASE_PATH}/favicon.svg`} type="image/svg+xml" />
+        <link rel="icon" href={`${BASE_PATH}/favicon-48.png`} type="image/png" sizes="48x48" />
+        <link rel="apple-touch-icon" href={`${BASE_PATH}/apple-touch-icon.png`} />
+        <link rel="manifest" href={`${BASE_PATH}/manifest.webmanifest`} />
+        <meta name="theme-color" content="#2E5090" />
+        <meta name="apple-mobile-web-app-title" content="WITHKIDS" />
       </Head>
       <Component {...pageProps} />
     </>
