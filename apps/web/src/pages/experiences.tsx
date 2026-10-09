@@ -422,15 +422,15 @@ export default function ExperiencesPage() {
                   }
                 }}
                 aria-pressed={excludeKidsCafe}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium ${
                   excludeKidsCafe
-                    ? 'border-blue-600 bg-blue-50 text-blue-700'
-                    : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
                 <span
                   className={`w-4 h-4 rounded border flex items-center justify-center text-[10px] ${
-                    excludeKidsCafe ? 'bg-blue-600 border-blue-600 text-white' : 'border-gray-400'
+                    excludeKidsCafe ? 'bg-white border-white text-blue-600' : 'border-gray-400'
                   }`}
                 >
                   {excludeKidsCafe ? '✓' : ''}
@@ -478,7 +478,7 @@ export default function ExperiencesPage() {
                       setCurrentPage(1);
                     }}
                     title={option.hint}
-                    className={`px-4 py-2 rounded-full font-medium transition-colors ${
+                    className={`px-3.5 py-1.5 rounded-full text-sm font-medium ${
                       eligibility === option.value
                         ? 'bg-blue-600 text-white'
                         : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -499,7 +499,7 @@ export default function ExperiencesPage() {
                   setSelectedAgeGroup(selectedAgeGroup === age ? null : age);
                   setCurrentPage(1);
                 }}
-                className={`px-4 py-2 rounded-full font-medium transition-colors ${
+                className={`px-3.5 py-1.5 rounded-full text-sm font-medium ${
                   selectedAgeGroup === age
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -714,10 +714,10 @@ function FilterRow<T extends string>({
           key={option.value || 'any'}
           onClick={() => onChange(option.value)}
           title={option.hint}
-          className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+          className={`px-3.5 py-1.5 rounded-full text-sm font-medium ${
             value === option.value
-              ? 'border-blue-600 bg-blue-50 text-blue-700'
-              : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
           }`}
         >
           {option.label}

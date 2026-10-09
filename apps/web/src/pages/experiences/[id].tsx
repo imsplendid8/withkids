@@ -291,7 +291,7 @@ export default function ExperienceDetailPage() {
         </button>
 
         {/* Image Gallery */}
-        <div className="relative bg-gradient-to-br from-blue-100 to-blue-50 rounded-lg overflow-hidden aspect-video flex items-center justify-center text-blue-400">
+        <div className="relative bg-gray-100 rounded-lg overflow-hidden aspect-video flex items-center justify-center text-gray-300">
           <FiCalendar size={96} />
         </div>
 

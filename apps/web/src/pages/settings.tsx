@@ -67,12 +67,7 @@ function Segmented<T extends string>({
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mb-6">
-      <h2
-        className="px-1 mb-2 text-sm font-semibold text-gray-500"
-        style={{ fontSize: '0.875rem' }}
-      >
-        {title}
-      </h2>
+      <h2 className="px-1 mb-2 text-sm font-semibold text-gray-500">{title}</h2>
       <div className="bg-white rounded-2xl border border-gray-200 divide-y divide-gray-100">
         {children}
       </div>
@@ -155,9 +150,7 @@ export default function SettingsPage() {
   return (
     <MainLayout>
       <div className="max-w-xl mx-auto">
-        <h1 className="text-2xl font-bold text-gray-900 mb-5" style={{ fontSize: '1.5rem' }}>
-          더보기 · 설정
-        </h1>
+        <h1 className="text-2xl font-bold text-gray-900 mb-5">더보기 · 설정</h1>
 
         <Section title="메뉴">
           {MORE_LINKS.map(({ href, label, icon: Icon }) => (
@@ -217,7 +210,7 @@ export default function SettingsPage() {
         <Section title="앱으로 쓰기">
           <div className="p-4">
             {installed ? (
-              <p className="text-gray-700">지금 앱으로 실행 중이에요. 🎉</p>
+              <p className="text-gray-700">지금 앱으로 실행 중이에요.</p>
             ) : canPrompt ? (
               <button
                 type="button"

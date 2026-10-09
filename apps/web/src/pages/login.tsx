@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useAuthStore, type User } from '@/store/authStore';
 import { apiClient } from '@/lib/api';
-import { STATIC_MODE } from '@/lib/staticMode';
+import { BASE_PATH, STATIC_MODE } from '@/lib/staticMode';
 import { CLOUD_ENABLED, signInWithGoogle } from '@/lib/cloud';
 
 export default function LoginPage() {
@@ -52,11 +52,18 @@ export default function LoginPage() {
 
   if (STATIC_MODE && CLOUD_ENABLED) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center px-4">
-        <div className="w-full max-w-md bg-white rounded-lg shadow-lg p-8 text-center space-y-6">
-          <div>
-            <h1 className="text-3xl font-bold text-blue-600">WITHKIDS</h1>
-            <p className="text-gray-600 mt-2">아이와 갈 체험·축제를 한곳에서</p>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+        <div className="w-full max-w-sm bg-white rounded-2xl border border-gray-200 p-8 text-center space-y-6">
+          <div className="flex flex-col items-center">
+            <img
+              src={`${BASE_PATH}/favicon.svg`}
+              alt=""
+              width={56}
+              height={56}
+              className="rounded-2xl"
+            />
+            <h1 className="text-2xl font-bold text-gray-900 mt-4">WITHKIDS</h1>
+            <p className="text-gray-600 mt-1">아이와 갈 체험·축제를 한곳에서</p>
           </div>
           {(error || cloudError) && (
             <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
@@ -116,7 +123,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         <div className="bg-white rounded-lg shadow-lg p-8">
           {/* Logo */}

@@ -157,7 +157,7 @@ export function ProgramImage({
 
   return (
     <div
-      className={`${className} bg-gradient-to-br from-blue-100 to-blue-50 flex items-center justify-center text-blue-400 overflow-hidden`}
+      className={`${className} bg-gray-100 flex items-center justify-center text-gray-300 overflow-hidden`}
     >
       {url && !failed ? (
         <img

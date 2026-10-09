@@ -137,7 +137,7 @@ export default function NoticesPage() {
             <button
               key={s.id || 'all'}
               onClick={() => setSource(s.id)}
-              className={`px-4 py-2 rounded-full font-medium transition-colors ${
+              className={`px-3.5 py-1.5 rounded-full text-sm font-medium ${
                 source === s.id
                   ? 'bg-blue-600 text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
