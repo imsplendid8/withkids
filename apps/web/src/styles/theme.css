@@ -1,0 +1,277 @@
+/* 다크 모드: 자주 쓰는 색 클래스를 한곳에서 어둡게 바꾼다 (html.dark일 때만) */
+:root.dark {
+  --color-neutral-50: #0f172a;
+  --color-neutral-100: #1e293b;
+  --color-neutral-200: #334155;
+  --color-neutral-300: #475569;
+  --color-neutral-400: #64748b;
+  --color-neutral-500: #94a3b8;
+  --color-neutral-600: #a8b5c7;
+  --color-neutral-700: #cbd5e1;
+  --color-neutral-800: #e2e8f0;
+  --color-neutral-900: #f1f5f9;
+}
+html.dark body {
+  background-color: #0f172a;
+}
+html.dark input,
+html.dark select,
+html.dark textarea {
+  background-color: #0f172a;
+  color: #e2e8f0;
+  border-color: #3b4a60;
+}
+html.dark input::placeholder,
+html.dark textarea::placeholder {
+  color: #64748b;
+}
+html.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #273449;
+}
+html.dark .from-blue-50,
+html.dark .from-blue-100 {
+  --tw-gradient-from: #1e293b var(--tw-gradient-from-position);
+  --tw-gradient-to: rgb(30 41 59 / 0) var(--tw-gradient-to-position);
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+html.dark .to-blue-50,
+html.dark .to-indigo-100 {
+  --tw-gradient-to: #1e2a4a var(--tw-gradient-to-position);
+}
+html.dark .bg-white {
+  background-color: #1e293b;
+}
+html.dark .bg-slate-50 {
+  background-color: #0f172a;
+}
+html.dark .bg-gray-50 {
+  background-color: #172033;
+}
+html.dark .bg-gray-100 {
+  background-color: #273449;
+}
+html.dark .bg-slate-100 {
+  background-color: #273449;
+}
+html.dark .bg-gray-200 {
+  background-color: #334155;
+}
+html.dark .bg-gray-400 {
+  background-color: #475569;
+}
+html.dark .bg-blue-50 {
+  background-color: rgba(59, 130, 246, 0.14);
+}
+html.dark .bg-blue-100 {
+  background-color: rgba(59, 130, 246, 0.22);
+}
+html.dark .bg-red-50 {
+  background-color: rgba(239, 68, 68, 0.14);
+}
+html.dark .bg-red-100 {
+  background-color: rgba(239, 68, 68, 0.22);
+}
+html.dark .bg-green-50 {
+  background-color: rgba(34, 197, 94, 0.14);
+}
+html.dark .bg-green-100 {
+  background-color: rgba(34, 197, 94, 0.22);
+}
+html.dark .bg-emerald-50 {
+  background-color: rgba(16, 185, 129, 0.14);
+}
+html.dark .bg-emerald-100 {
+  background-color: rgba(16, 185, 129, 0.22);
+}
+html.dark .bg-yellow-50 {
+  background-color: rgba(234, 179, 8, 0.14);
+}
+html.dark .bg-yellow-100 {
+  background-color: rgba(234, 179, 8, 0.22);
+}
+html.dark .bg-yellow-200 {
+  background-color: rgba(234, 179, 8, 0.3);
+}
+html.dark .bg-amber-50 {
+  background-color: rgba(245, 158, 11, 0.14);
+}
+html.dark .bg-amber-100 {
+  background-color: rgba(245, 158, 11, 0.22);
+}
+html.dark .bg-orange-100 {
+  background-color: rgba(249, 115, 22, 0.22);
+}
+html.dark .bg-purple-100 {
+  background-color: rgba(168, 85, 247, 0.22);
+}
+html.dark .hover\:bg-gray-50:hover {
+  background-color: #273449;
+}
+html.dark .hover\:bg-slate-50:hover {
+  background-color: #273449;
+}
+html.dark .hover\:bg-slate-100:hover {
+  background-color: #273449;
+}
+html.dark .hover\:bg-gray-200:hover {
+  background-color: #334155;
+}
+html.dark .hover\:bg-white:hover {
+  background-color: #273449;
+}
+html.dark .hover\:bg-blue-50:hover {
+  background-color: rgba(59, 130, 246, 0.2);
+}
+html.dark .hover\:bg-blue-100:hover {
+  background-color: rgba(59, 130, 246, 0.28);
+}
+html.dark .hover\:bg-blue-200:hover {
+  background-color: rgba(59, 130, 246, 0.35);
+}
+html.dark .hover\:bg-red-50:hover {
+  background-color: rgba(239, 68, 68, 0.2);
+}
+html.dark .hover\:bg-red-100:hover {
+  background-color: rgba(239, 68, 68, 0.28);
+}
+html.dark .hover\:bg-yellow-200:hover {
+  background-color: rgba(234, 179, 8, 0.35);
+}
+html.dark .text-gray-900 {
+  color: #f1f5f9;
+}
+html.dark .text-slate-900 {
+  color: #f1f5f9;
+}
+html.dark .text-gray-800 {
+  color: #e2e8f0;
+}
+html.dark .text-gray-700 {
+  color: #cbd5e1;
+}
+html.dark .text-gray-600 {
+  color: #a8b5c7;
+}
+html.dark .text-slate-600 {
+  color: #a8b5c7;
+}
+html.dark .text-gray-500 {
+  color: #8a99ad;
+}
+html.dark .text-slate-500 {
+  color: #8a99ad;
+}
+html.dark .text-gray-400 {
+  color: #6b7a90;
+}
+html.dark .text-slate-400 {
+  color: #6b7a90;
+}
+html.dark .text-gray-300 {
+  color: #526074;
+}
+html.dark .text-blue-600 {
+  color: #60a5fa;
+}
+html.dark .text-blue-700 {
+  color: #7cb4fb;
+}
+html.dark .text-blue-800 {
+  color: #93c5fd;
+}
+html.dark .text-blue-900 {
+  color: #bfdbfe;
+}
+html.dark .text-red-600 {
+  color: #f87171;
+}
+html.dark .text-red-700 {
+  color: #fca5a5;
+}
+html.dark .text-red-800 {
+  color: #fca5a5;
+}
+html.dark .text-green-600 {
+  color: #4ade80;
+}
+html.dark .text-green-700 {
+  color: #86efac;
+}
+html.dark .text-green-800 {
+  color: #86efac;
+}
+html.dark .text-emerald-700 {
+  color: #6ee7b7;
+}
+html.dark .text-emerald-800 {
+  color: #6ee7b7;
+}
+html.dark .text-yellow-800 {
+  color: #fde047;
+}
+html.dark .text-yellow-900 {
+  color: #fef08a;
+}
+html.dark .text-amber-700 {
+  color: #fcd34d;
+}
+html.dark .text-amber-800 {
+  color: #fcd34d;
+}
+html.dark .text-orange-800 {
+  color: #fdba74;
+}
+html.dark .text-purple-600 {
+  color: #c084fc;
+}
+html.dark .text-purple-800 {
+  color: #d8b4fe;
+}
+html.dark .hover\:text-gray-900:hover {
+  color: #f8fafc;
+}
+html.dark .hover\:text-slate-900:hover {
+  color: #f8fafc;
+}
+html.dark .hover\:text-gray-600:hover {
+  color: #cbd5e1;
+}
+html.dark .hover\:text-slate-700:hover {
+  color: #e2e8f0;
+}
+html.dark .hover\:text-blue-700:hover {
+  color: #93c5fd;
+}
+html.dark .border-gray-100 {
+  border-color: #273449;
+}
+html.dark .border-gray-200 {
+  border-color: #334155;
+}
+html.dark .border-gray-300 {
+  border-color: #3b4a60;
+}
+html.dark .border-slate-200 {
+  border-color: #334155;
+}
+html.dark .border-gray-400 {
+  border-color: #475569;
+}
+html.dark .border-blue-200 {
+  border-color: rgba(59, 130, 246, 0.35);
+}
+html.dark .border-red-200 {
+  border-color: rgba(239, 68, 68, 0.35);
+}
+html.dark .border-red-300 {
+  border-color: rgba(239, 68, 68, 0.45);
+}
+html.dark .border-green-200 {
+  border-color: rgba(34, 197, 94, 0.35);
+}
+html.dark .border-emerald-200 {
+  border-color: rgba(16, 185, 129, 0.35);
+}
+html.dark .border-yellow-200 {
+  border-color: rgba(234, 179, 8, 0.35);
+}

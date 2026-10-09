@@ -37,9 +37,19 @@ html {
 }
 
 body {
-  font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, 'Segoe UI',
-    'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans',
-    'Helvetica Neue', sans-serif;
+  font-family:
+    'Noto Sans KR',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    'Roboto',
+    'Oxygen',
+    'Ubuntu',
+    'Cantarell',
+    'Fira Sans',
+    'Droid Sans',
+    'Helvetica Neue',
+    sans-serif;
   background-color: #ffffff;
   color: var(--color-neutral-700);
   line-height: 1.6;
@@ -86,7 +96,8 @@ h4 {
   margin-bottom: 0.5rem;
 }
 
-h5, h6 {
+h5,
+h6 {
   font-size: 1rem;
   font-weight: 600;
   letter-spacing: 0.25px;
@@ -191,4 +202,45 @@ code {
 /* Smooth transitions */
 * {
   @apply transition-colors duration-200;
+}
+
+/* ── 화면 설정 (설정 → 화면) ───────────────────────────── */
+
+/* 글자 크게: rem 단위로 만든 화면 전체가 함께 커진다 */
+html[data-font='large'] {
+  font-size: 18px;
+}
+
+/* "모바일 화면"을 PC에서 고르면 휴대폰 폭으로 가운데에 보여 준다 */
+@media (min-width: 640px) {
+  html[data-layout='mobile'] body {
+    background-color: #e2e8f0;
+  }
+  html.dark[data-layout='mobile'] body {
+    background-color: #020617;
+  }
+  html[data-layout='mobile'] .app-shell {
+    max-width: 480px;
+    margin: 0 auto;
+    box-shadow:
+      0 0 0 1px rgb(15 23 42 / 0.06),
+      0 10px 40px rgb(15 23 42 / 0.15);
+  }
+  html[data-layout='mobile'] .app-bottom-nav {
+    max-width: 480px;
+    margin: 0 auto;
+  }
+}
+
+/* 아래 탭 바 높이 + 아이폰 홈 막대 자리 */
+.app-bottom-nav {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.app-bottom-space {
+  height: calc(4rem + env(safe-area-inset-bottom));
+}
+
+/* 앱처럼: 탭할 때 회색 번쩍임 없애기 */
+html {
+  -webkit-tap-highlight-color: transparent;
 }
