@@ -7,7 +7,8 @@ import { apiClient } from '@/lib/api';
 import { MainLayout } from '@/components/layouts/MainLayout';
 import { CrawlStatusPanel } from '@/components/CrawlStatusPanel';
 import { dDayLabel, daysFromToday, formatMonthDay, formatTime } from '@/lib/bookingDates';
-import { FiBookmark, FiClock, FiExternalLink } from 'react-icons/fi';
+import { FiBookmark, FiClock, FiExternalLink, FiMapPin } from 'react-icons/fi';
+import { loadPlaces, upcomingMonthNotes, type PlacesData } from '@/lib/places';
 
 interface ScheduleRun {
   id: string;
@@ -28,6 +29,11 @@ export default function DashboardPage() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading } = useAuthStore();
   const { bookmarks, hydrate: hydrateBookmarks } = useBookmarkStore();
+  const [myPlaces, setMyPlaces] = useState<PlacesData | null>(null);
+
+  useEffect(() => {
+    setMyPlaces(loadPlaces());
+  }, []);
 
   const [schedule, setSchedule] = useState<ScheduleRun[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(true);
@@ -89,6 +95,11 @@ export default function DashboardPage() {
             href="/experiences/saved"
           />
         </section>
+
+        {/* 내 장소: 이번 달·다음 달 축제 메모 */}
+        {myPlaces && (myPlaces.months.length > 0 || myPlaces.places.length > 0) && (
+          <MonthNotesCard data={myPlaces} today={today} />
+        )}
 
         {/* 접수 일정 */}
         <section className="bg-white rounded-lg shadow p-6">
@@ -218,5 +229,42 @@ function ScheduleItem({ run }: { run: ScheduleRun }) {
         </Link>
       )}
     </li>
+  );
+}
+
+function MonthNotesCard({ data, today }: { data: PlacesData; today: Date }) {
+  const upcoming = upcomingMonthNotes(data.months, today);
+  const revisit = data.places.filter((p) => p.revisit).length;
+  return (
+    <section className="bg-white rounded-2xl border border-gray-200 p-5">
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-lg font-bold text-gray-900">내 축제 메모</h2>
+        <Link
+          href="/places"
+          className="text-sm font-medium text-blue-600 inline-flex items-center gap-1"
+        >
+          <FiMapPin size={14} /> 내 장소
+        </Link>
+      </div>
+      <div className="space-y-2">
+        {upcoming.map(({ month, notes }) => (
+          <div key={month} className="flex gap-3">
+            <span className="w-10 shrink-0 text-sm font-semibold text-gray-500 tabular-nums">
+              {month}월
+            </span>
+            <p className="text-sm text-gray-900">
+              {notes.length ? (
+                notes.map((n) => n.name).join(' · ')
+              ) : (
+                <span className="text-gray-400">없음</span>
+              )}
+            </p>
+          </div>
+        ))}
+      </div>
+      {revisit > 0 && (
+        <p className="text-xs text-gray-500 mt-3">☆ 또 갈 곳 {revisit}곳을 적어 뒀어요</p>
+      )}
+    </section>
   );
 }

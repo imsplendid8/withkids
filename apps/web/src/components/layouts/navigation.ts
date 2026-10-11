@@ -10,6 +10,7 @@ import {
   FiUser,
   FiBell,
   FiSettings,
+  FiMapPin,
 } from 'react-icons/fi';
 
 export interface NavLink {
@@ -24,6 +25,7 @@ export const NAV_LINKS: NavLink[] = [
   { href: '/experiences', label: '프로그램 둘러보기', icon: FiSearch },
   { href: '/paid', label: '유료 체험', icon: FiTag },
   { href: '/festivals', label: '축제', icon: FiCalendar },
+  { href: '/places', label: '내 장소', icon: FiMapPin },
   { href: '/notices', label: '기관 공지', icon: FiFileText },
   { href: '/bookings', label: '예약 관리', icon: FiClipboard },
   { href: '/profile', label: '프로필', icon: FiUser },
@@ -40,6 +42,7 @@ export const TAB_LINKS: NavLink[] = [
 
 /** 더보기 화면의 메뉴 */
 export const MORE_LINKS: NavLink[] = [
+  { href: '/places', label: '내 장소 · 견학 · 축제 달력', icon: FiMapPin },
   { href: '/paid', label: '유료 체험', icon: FiTag },
   { href: '/notices', label: '기관 공지', icon: FiFileText },
   { href: '/notifications', label: '알림', icon: FiBell },

@@ -58,7 +58,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       {/* 위쪽 바: 휴대폰에서는 로고와 알림만, PC에서는 메뉴까지 */}
       <header className="bg-white border-b border-slate-200 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-14 md:h-16">
+          <div className="flex justify-between items-center h-14 lg:h-16">
             <Link href="/dashboard" className="flex items-center gap-2">
               <img
                 src={`${BASE_PATH}/favicon.svg`}
@@ -70,12 +70,12 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               <span className="text-lg font-bold text-slate-900 tracking-tight">WITHKIDS</span>
             </Link>
 
-            <nav className="hidden md:flex items-center space-x-1">
+            <nav className="hidden lg:flex items-center space-x-1">
               {NAV_LINKS.map((link) => (
                 <Link
                   key={link.href}
                   href={link.href}
-                  className={`px-3 lg:px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                  className={`px-3 xl:px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
                     isActive(router.pathname, link.href)
                       ? 'bg-blue-50 text-blue-700'
                       : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
@@ -102,7 +102,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               </button>
               <Link
                 href="/settings"
-                className="hidden md:inline-flex p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors duration-200"
+                className="hidden lg:inline-flex p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors duration-200"
                 title="설정"
                 aria-label="설정"
               >
@@ -111,7 +111,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
               {canLogout && (
                 <button
                   onClick={handleLogout}
-                  className="hidden md:inline-flex p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors duration-200"
+                  className="hidden lg:inline-flex p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors duration-200"
                   title="로그아웃"
                   aria-label="로그아웃"
                 >
@@ -125,7 +125,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5 md:py-8">{children}</main>
 
-      <footer className="hidden md:block bg-slate-900 border-t border-slate-800 mt-16">
+      <footer className="hidden lg:block bg-slate-900 border-t border-slate-800 mt-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="text-center text-slate-400 text-sm">
             <p>&copy; 2026 WITHKIDS. All rights reserved.</p>
@@ -134,9 +134,9 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
       </footer>
 
       {/* 휴대폰: 앱처럼 아래 탭 */}
-      <div className="app-bottom-space md:hidden" />
+      <div className="app-bottom-space lg:hidden" />
       <nav
-        className="app-bottom-nav md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-slate-200"
+        className="app-bottom-nav lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-slate-200"
         aria-label="주요 메뉴"
       >
         <div className="grid grid-cols-5 h-16">
@@ -144,7 +144,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
             const active =
               isActive(router.pathname, href) ||
               (href === '/settings' &&
-                ['/paid', '/notices', '/notifications', '/profile'].some((p) =>
+                ['/paid', '/places', '/notices', '/notifications', '/profile'].some((p) =>
                   isActive(router.pathname, p)
                 ));
             return (
