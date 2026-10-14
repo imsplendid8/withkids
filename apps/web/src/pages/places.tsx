@@ -1,15 +1,32 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
+import type { IconType } from 'react-icons';
 import {
+  FiArchive,
+  FiBookOpen,
+  FiCamera,
   FiCheck,
+  FiCoffee,
+  FiDroplet,
+  FiFeather,
+  FiFlag,
   FiHeart,
+  FiHome,
+  FiImage,
   FiMapPin,
   FiPlus,
   FiSearch,
+  FiShoppingBag,
+  FiSliders,
+  FiSmile,
   FiStar,
+  FiSun,
+  FiTool,
   FiTrash2,
+  FiTriangle,
   FiX,
+  FiZap,
 } from 'react-icons/fi';
 import { MainLayout } from '@/components/layouts/MainLayout';
 import { useAuthStore } from '@/store/authStore';
@@ -40,6 +57,7 @@ import {
   type MyPlaces,
   type PlaceMark,
   type Region,
+  type Season,
 } from '@/lib/placeGuide';
 
 type Tab = 'places' | 'tours' | 'festivals';
@@ -74,6 +92,7 @@ export default function PlacesPage() {
   const [open, setOpen] = useState<GuidePlace | null>(null);
   const [adding, setAdding] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [filtering, setFiltering] = useState(false);
   const today = useMemo(() => new Date(), []);
 
   useEffect(() => {
@@ -109,6 +128,23 @@ export default function PlacesPage() {
     () => PLACE_CATEGORIES.filter((c) => c !== '기타' && allPlaces.some((p) => p.category === c)),
     [allPlaces]
   );
+  const markLabel = Object.fromEntries(MARKS) as Record<MarkFilter, string>;
+  type Active = { label: string; clear: Partial<GuideFilter> };
+  const extraFilters = (
+    [
+      filter.sigungu ? { label: filter.sigungu, clear: { sigungu: '' } } : null,
+      filter.category ? { label: filter.category, clear: { category: '' } } : null,
+      filter.indoor ? { label: '실내', clear: { indoor: false } } : null,
+      filter.outdoor ? { label: '야외', clear: { outdoor: false } } : null,
+      filter.thisSeason
+        ? { label: `${SEASON_LABEL[seasonOf(today)]}에 좋은 곳`, clear: { thisSeason: false } }
+        : null,
+      filter.night ? { label: '야경', clear: { night: false } } : null,
+      filter.mark !== 'all'
+        ? { label: markLabel[filter.mark], clear: { mark: 'all' as MarkFilter } }
+        : null,
+    ] as Array<Active | null>
+  ).filter((f): f is Active => f !== null);
   const visitedCount = Object.values(mine.marks).filter((m) => m.visited).length;
   const revisitCount = Object.values(mine.marks).filter((m) => m.revisit).length;
   const season = seasonOf(today);
@@ -119,14 +155,8 @@ export default function PlacesPage() {
         <div className="mb-5">
           <h1 className="text-3xl font-bold text-gray-900">가볼 만한 곳</h1>
           <p className="text-gray-600 mt-1">
-            아이와 다녀온 곳을 정리한 {GUIDE_PLACES.length}곳
-            {visitedCount > 0 && (
-              <>
-                {' '}
-                · 내가 가 본 곳 <b className="text-gray-900">{visitedCount}</b>
-                {revisitCount > 0 && <> · 또 갈 곳 {revisitCount}</>}
-              </>
-            )}
+            {GUIDE_PLACES.length}곳{visitedCount > 0 && ` · 가 본 곳 ${visitedCount}`}
+            {revisitCount > 0 && ` · 또 갈 곳 ${revisitCount}`}
           </p>
         </div>
 
@@ -159,13 +189,13 @@ export default function PlacesPage() {
               <input
                 value={filter.search}
                 onChange={(e) => set({ search: e.target.value })}
-                placeholder="이름·지역·종류 검색 (예: 과학관, 파주)"
+                placeholder="과학관, 파주처럼 검색"
                 className="input-field pl-10"
               />
             </div>
 
-            <div className="space-y-2 mb-5">
-              <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="flex gap-1.5 overflow-x-auto flex-1 -ml-4 pl-4 pr-1">
                 {REGIONS.map(([value, label]) => (
                   <button
                     key={value || 'all'}
@@ -176,106 +206,50 @@ export default function PlacesPage() {
                     {label}
                   </button>
                 ))}
-                <select
-                  value={filter.sigungu}
-                  onChange={(e) => set({ sigungu: e.target.value })}
-                  className="shrink-0 rounded-full bg-gray-100 border-0 text-sm font-medium text-gray-700 pl-3.5 pr-8 py-1.5"
-                  aria-label="시군구"
-                >
-                  <option value="">시·군·구 전체</option>
-                  {areas.map((a) => (
-                    <option key={a} value={a}>
-                      {a}
-                    </option>
-                  ))}
-                </select>
               </div>
-              <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
-                <button
-                  type="button"
-                  onClick={() => set({ category: '' })}
-                  className={chip(!filter.category)}
-                >
-                  모든 종류
-                </button>
-                {categories.map((c) => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => set({ category: filter.category === c ? '' : c })}
-                    className={chip(filter.category === c)}
-                  >
-                    {c}
-                  </button>
-                ))}
-              </div>
-              <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
-                <button
-                  type="button"
-                  onClick={() => set({ indoor: !filter.indoor, outdoor: false })}
-                  className={chip(filter.indoor)}
-                >
-                  실내 (비 오는 날)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => set({ outdoor: !filter.outdoor, indoor: false })}
-                  className={chip(filter.outdoor)}
-                >
-                  야외
-                </button>
-                <button
-                  type="button"
-                  onClick={() => set({ thisSeason: !filter.thisSeason })}
-                  className={chip(filter.thisSeason)}
-                >
-                  {SEASON_LABEL[season]}에 좋은 곳
-                </button>
-                <button
-                  type="button"
-                  onClick={() => set({ night: !filter.night })}
-                  className={chip(filter.night)}
-                >
-                  야경·밤
-                </button>
-              </div>
-              <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
-                {MARKS.map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => set({ mark: value })}
-                    className={chip(filter.mark === value)}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
+              <button
+                type="button"
+                onClick={() => setFiltering(true)}
+                className={`shrink-0 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium border ${
+                  extraFilters.length
+                    ? 'border-blue-600 text-blue-700 bg-white'
+                    : 'border-gray-200 text-gray-700 bg-white'
+                }`}
+              >
+                <FiSliders size={14} />
+                필터{extraFilters.length > 0 && ` ${extraFilters.length}`}
+              </button>
             </div>
 
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm text-gray-600">
-                <b className="text-gray-900 tabular-nums">{shown.length}</b>곳
-              </p>
-              {JSON.stringify(filter) !== JSON.stringify(DEFAULT_GUIDE_FILTER) && (
-                <button
-                  type="button"
-                  onClick={() => setFilter(DEFAULT_GUIDE_FILTER)}
-                  className="text-sm text-blue-600 font-medium"
-                >
-                  조건 지우기
-                </button>
-              )}
-            </div>
+            {extraFilters.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {extraFilters.map((f) => (
+                  <button
+                    key={f.label}
+                    type="button"
+                    onClick={() => set(f.clear)}
+                    className="inline-flex items-center gap-1 pl-3 pr-2 py-1 rounded-full bg-blue-50 text-blue-700 text-sm font-medium"
+                    aria-label={`${f.label} 조건 빼기`}
+                  >
+                    {f.label}
+                    <FiX size={14} />
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <p className="text-sm text-gray-500 mb-4">
+              <span className="font-semibold text-gray-900 tabular-nums">{shown.length}</span>곳
+            </p>
 
             {groups.length === 0 ? (
               <p className="text-center text-gray-500 py-12">조건에 맞는 곳이 없어요</p>
             ) : (
-              <div className="space-y-6">
+              <div className="space-y-4">
                 {groups.map(({ area, places }) => (
                   <section key={area}>
-                    <h2 className="text-sm font-semibold text-gray-500 mb-2">
-                      {area} <span className="text-gray-400">{places.length}</span>
+                    <h2 className="sticky top-14 lg:top-16 z-10 -mx-4 px-4 py-2 bg-slate-50 text-sm font-semibold text-gray-600">
+                      {area} <span className="font-normal text-gray-400">{places.length}</span>
                     </h2>
                     <ul className="bg-white rounded-2xl border border-gray-200 divide-y divide-gray-100">
                       {places.map((p) => (
@@ -346,6 +320,19 @@ export default function PlacesPage() {
           }}
         />
       )}
+      {filtering && (
+        <FilterSheet
+          filter={filter}
+          areas={areas}
+          categories={categories}
+          season={season}
+          onChange={set}
+          onReset={() =>
+            setFilter({ ...DEFAULT_GUIDE_FILTER, search: filter.search, region: filter.region })
+          }
+          onClose={() => setFiltering(false)}
+        />
+      )}
       {importing && (
         <ImportSheet
           onClose={() => setImporting(false)}
@@ -360,6 +347,25 @@ export default function PlacesPage() {
   );
 }
 
+const CATEGORY_ICON: Record<PlaceCategory, IconType> = {
+  박물관: FiArchive,
+  '미술관·전시': FiImage,
+  과학관: FiZap,
+  체험: FiTool,
+  실내놀이: FiSmile,
+  '공원·자연': FiSun,
+  '동물·농장': FiFeather,
+  테마파크: FiFlag,
+  물놀이: FiDroplet,
+  역사: FiHome,
+  명소: FiCamera,
+  '도서관·책': FiBookOpen,
+  '카페·식당': FiCoffee,
+  캠핑: FiTriangle,
+  쇼핑몰: FiShoppingBag,
+  기타: FiMapPin,
+};
+
 function PlaceRow({
   place,
   mark,
@@ -369,11 +375,16 @@ function PlaceRow({
   mark?: PlaceMark;
   onOpen: () => void;
 }) {
-  const tags = [
-    place.indoor && !place.outdoor ? '실내' : place.outdoor && !place.indoor ? '야외' : '실내·야외',
+  const Icon = CATEGORY_ICON[place.category];
+  const where =
+    place.indoor && place.outdoor ? '' : place.indoor ? '실내' : place.outdoor ? '야외' : '';
+  const meta = [
+    place.category !== '기타' ? place.category : '',
+    where,
     ...place.seasons.map((s) => SEASON_LABEL[s]),
     place.night ? '야경' : '',
-    place.weekdayOnly ? '평일' : '',
+    place.weekdayOnly ? '평일만' : '',
+    place.note,
   ].filter(Boolean);
   return (
     <li>
@@ -382,6 +393,9 @@ function PlaceRow({
         onClick={onOpen}
         className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50"
       >
+        <span className="w-9 h-9 shrink-0 rounded-xl bg-gray-100 text-gray-500 flex items-center justify-center">
+          <Icon size={17} />
+        </span>
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-gray-900 truncate">
             {place.name}
@@ -389,28 +403,128 @@ function PlaceRow({
               <span className="ml-1.5 text-xs font-medium text-gray-500">내가 추가</span>
             )}
           </p>
-          <p className="text-sm text-gray-500 truncate">
-            {place.category !== '기타' && <span>{place.category}</span>}
-            {place.category !== '기타' && tags.length > 0 && ' · '}
-            {tags.join(' · ')}
-            {place.note && ` · ${place.note}`}
-          </p>
+          {meta.length > 0 && <p className="text-sm text-gray-500 truncate">{meta.join(' · ')}</p>}
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          {mark?.revisit ? (
-            <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-1 rounded-md">
-              <FiStar size={12} /> 또 갈 곳
-            </span>
-          ) : mark?.visited ? (
-            <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md">
-              <FiCheck size={12} /> 가 봄
-            </span>
-          ) : mark?.want ? (
-            <FiHeart className="text-red-600" size={16} aria-label="가 보고 싶은 곳" />
-          ) : null}
-        </div>
+        {mark?.revisit ? (
+          <span className="shrink-0 text-xs font-semibold text-amber-600">또 갈 곳</span>
+        ) : mark?.visited ? (
+          <span className="shrink-0 text-xs font-semibold text-gray-400">가 봄</span>
+        ) : null}
       </button>
     </li>
+  );
+}
+
+function FilterSheet({
+  filter,
+  areas,
+  categories,
+  season,
+  onChange,
+  onReset,
+  onClose,
+}: {
+  filter: GuideFilter;
+  areas: string[];
+  categories: PlaceCategory[];
+  season: Season;
+  onChange: (patch: Partial<GuideFilter>) => void;
+  onReset: () => void;
+  onClose: () => void;
+}) {
+  const Group = ({ title, children }: { title: string; children: React.ReactNode }) => (
+    <div className="mb-5">
+      <p className="text-sm font-semibold text-gray-900 mb-2">{title}</p>
+      <div className="flex flex-wrap gap-1.5">{children}</div>
+    </div>
+  );
+  return (
+    <Sheet title="필터" onClose={onClose}>
+      <div className="mb-5">
+        <p className="text-sm font-semibold text-gray-900 mb-2">시·군·구</p>
+        <select
+          value={filter.sigungu}
+          onChange={(e) => onChange({ sigungu: e.target.value })}
+          className="input-field"
+        >
+          <option value="">전체</option>
+          {areas.map((a) => (
+            <option key={a} value={a}>
+              {a}
+            </option>
+          ))}
+        </select>
+      </div>
+      <Group title="종류">
+        <button
+          type="button"
+          onClick={() => onChange({ category: '' })}
+          className={chip(!filter.category)}
+        >
+          전체
+        </button>
+        {categories.map((c) => (
+          <button
+            key={c}
+            type="button"
+            onClick={() => onChange({ category: filter.category === c ? '' : c })}
+            className={chip(filter.category === c)}
+          >
+            {c}
+          </button>
+        ))}
+      </Group>
+      <Group title="조건">
+        <button
+          type="button"
+          onClick={() => onChange({ indoor: !filter.indoor, outdoor: false })}
+          className={chip(filter.indoor)}
+        >
+          실내
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange({ outdoor: !filter.outdoor, indoor: false })}
+          className={chip(filter.outdoor)}
+        >
+          야외
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange({ thisSeason: !filter.thisSeason })}
+          className={chip(filter.thisSeason)}
+        >
+          {SEASON_LABEL[season]}에 좋은 곳
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange({ night: !filter.night })}
+          className={chip(filter.night)}
+        >
+          야경
+        </button>
+      </Group>
+      <Group title="내 표시">
+        {MARKS.map(([value, label]) => (
+          <button
+            key={value}
+            type="button"
+            onClick={() => onChange({ mark: value })}
+            className={chip(filter.mark === value)}
+          >
+            {label}
+          </button>
+        ))}
+      </Group>
+      <div className="flex gap-2">
+        <button type="button" onClick={onReset} className="btn-secondary">
+          초기화
+        </button>
+        <button type="button" onClick={onClose} className="btn-primary flex-1">
+          보기
+        </button>
+      </div>
+    </Sheet>
   );
 }
 

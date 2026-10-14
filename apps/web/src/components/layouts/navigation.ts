@@ -42,7 +42,7 @@ export const TAB_LINKS: NavLink[] = [
 
 /** 더보기 화면의 메뉴 */
 export const MORE_LINKS: NavLink[] = [
-  { href: '/places', label: '가볼 만한 곳 · 견학 · 축제 달력', icon: FiMapPin },
+  { href: '/places', label: '가볼 만한 곳', icon: FiMapPin },
   { href: '/paid', label: '유료 체험', icon: FiTag },
   { href: '/notices', label: '기관 공지', icon: FiFileText },
   { href: '/notifications', label: '알림', icon: FiBell },
