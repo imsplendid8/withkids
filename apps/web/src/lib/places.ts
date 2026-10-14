@@ -1,18 +1,14 @@
 import { childFacts, type Child } from './eligibility';
 
 /**
- * 내 장소 노트: 가 본 곳·가 볼 곳·또 갈 곳, 나이 제한 있는 견학, 달마다 열리는 축제 메모.
- * 계정에 함께 저장한다 (withdkis.* 키).
+ * 메모장 형식 읽기: 예전에 적어 둔 메모에서 가 본 곳·☆ 표시를 가져올 때 쓴다 (placeGuide.ts).
  *
- * 메모장에 적던 형식을 그대로 붙여넣을 수 있다.
  *   강서 : 가볼곳1 가볼곳2 / 가본곳1 ☆또갈곳 ◇아이는안가본곳
  *   --------            (여기부터 근교·지방)
  *   초1 : 견학1 견학2    (나이 제한 있는 견학)
  *   ----                (여기부터 달마다 열리는 축제)
  *   5월 축제1 축제2
  */
-export const PLACES_KEY = 'withdkis.places';
-
 export type PlaceArea = 'seoul' | 'nearby';
 
 export interface Place {
@@ -51,8 +47,6 @@ export interface PlacesData {
   tours: TourNote[];
   months: MonthNote[];
 }
-
-export const EMPTY_PLACES: PlacesData = { places: [], tours: [], months: [] };
 
 // ── 붙여넣기 읽기 ─────────────────────────────────────────────
 
@@ -314,107 +308,7 @@ export function parsePlacesText(text: string): PlacesData {
   return result;
 }
 
-const keyOf = (region: string, name: string) => `${region}|${name}`.replace(/\s/g, '');
-
-/** 붙여넣은 내용을 기존 노트에 더한다. 같은 지역·이름이면 표시만 합친다 */
-export function mergePlaces(current: PlacesData, incoming: PlacesData): PlacesData {
-  const places = [...current.places];
-  const index = new Map(places.map((p, i) => [keyOf(p.region, p.name), i]));
-  for (const place of incoming.places) {
-    const at = index.get(keyOf(place.region, place.name));
-    if (at === undefined) {
-      index.set(keyOf(place.region, place.name), places.length);
-      places.push(place);
-    } else {
-      const old = places[at];
-      places[at] = {
-        ...old,
-        visited: old.visited || place.visited,
-        revisit: old.revisit || place.revisit,
-        kidNotYet: old.kidNotYet && place.kidNotYet,
-      };
-    }
-  }
-  const tourKeys = new Set(current.tours.map((t) => keyOf(t.label, t.name)));
-  const monthKeys = new Set(current.months.map((m) => keyOf(m.months.join(','), m.name)));
-  return {
-    places,
-    tours: [
-      ...current.tours,
-      ...incoming.tours.filter((t) => !tourKeys.has(keyOf(t.label, t.name))),
-    ],
-    months: [
-      ...current.months,
-      ...incoming.months.filter((m) => !monthKeys.has(keyOf(m.months.join(','), m.name))),
-    ],
-  };
-}
-
-// ── 저장 ─────────────────────────────────────────────────────
-
-export function loadPlaces(): PlacesData {
-  try {
-    const raw = localStorage.getItem(PLACES_KEY);
-    const data = raw ? (JSON.parse(raw) as Partial<PlacesData>) : {};
-    return {
-      places: Array.isArray(data.places) ? data.places : [],
-      tours: Array.isArray(data.tours) ? data.tours : [],
-      months: Array.isArray(data.months) ? data.months : [],
-    };
-  } catch {
-    return { ...EMPTY_PLACES };
-  }
-}
-
-export function savePlaces(data: PlacesData): void {
-  localStorage.setItem(PLACES_KEY, JSON.stringify(data));
-}
-
-export function createPlace(
-  input: Pick<Place, 'name' | 'region'> & Partial<Omit<Place, 'id' | 'name' | 'region'>>
-): Place {
-  const region = input.region.trim();
-  return {
-    id: newId('p'),
-    name: input.name.trim(),
-    region,
-    area: input.area ?? (isSeoulRegion(region) ? 'seoul' : 'nearby'),
-    visited: input.visited ?? false,
-    revisit: input.revisit ?? false,
-    kidNotYet: input.kidNotYet ?? false,
-    memo: input.memo,
-  };
-}
-
 // ── 보여 주기 ────────────────────────────────────────────────
-
-export type PlaceFilter = 'all' | 'todo' | 'visited' | 'revisit' | 'kidNotYet';
-
-export function matchesPlaceFilter(place: Place, filter: PlaceFilter): boolean {
-  switch (filter) {
-    case 'todo':
-      return !place.visited;
-    case 'visited':
-      return place.visited;
-    case 'revisit':
-      return place.revisit;
-    case 'kidNotYet':
-      return place.kidNotYet;
-    default:
-      return true;
-  }
-}
-
-/** 지역별로 묶는다 (처음 나온 순서 유지) */
-export function groupByRegion(places: Place[]): Array<{ region: string; places: Place[] }> {
-  const groups = new Map<string, Place[]>();
-  for (const place of places) {
-    const list = groups.get(place.region) ?? [];
-    list.push(place);
-    groups.set(place.region, list);
-  }
-  return [...groups].map(([region, list]) => ({ region, places: list }));
-}
 
 /** 지도 검색은 괄호 속 설명을 빼고 지역을 붙인다 */
 export function mapSearchUrl(place: Pick<Place, 'name' | 'region'>): string {
@@ -451,17 +345,4 @@ export function tourFits(
     if (tooOld) return { childName: name, ok: false };
     return { childName: name, ok: false, from: `${facts.birthYear + 6 + rule.min}년 3월부터` };
   });
-}
-
-/** 이번 달과 다음 달 축제 메모 */
-export function upcomingMonthNotes(
-  months: MonthNote[],
-  today: Date
-): Array<{ month: number; notes: MonthNote[] }> {
-  const thisMonth = today.getMonth() + 1;
-  const nextMonth = (thisMonth % 12) + 1;
-  return [thisMonth, nextMonth].map((month) => ({
-    month,
-    notes: months.filter((n) => n.months.includes(month)),
-  }));
 }

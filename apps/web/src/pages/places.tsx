@@ -1,309 +1,358 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { FiPlus, FiClipboard, FiSearch, FiMapPin, FiTrash2, FiX } from 'react-icons/fi';
+import {
+  FiCheck,
+  FiHeart,
+  FiMapPin,
+  FiPlus,
+  FiSearch,
+  FiStar,
+  FiTrash2,
+  FiX,
+} from 'react-icons/fi';
 import { MainLayout } from '@/components/layouts/MainLayout';
 import { useAuthStore } from '@/store/authStore';
-import { getChildren, defaultChildName } from '@/lib/children';
+import { defaultChildName, getChildren } from '@/lib/children';
 import type { Child } from '@/lib/eligibility';
+import { mapSearchUrl, tourFits } from '@/lib/places';
+import { PLACE_CATEGORIES, type PlaceCategory } from '@/data/placesGuide';
 import {
-  EMPTY_PLACES,
-  createPlace,
-  groupByRegion,
-  loadPlaces,
-  mapSearchUrl,
-  matchesPlaceFilter,
-  mergePlaces,
-  parseAgeRule,
-  parsePlacesText,
-  savePlaces,
-  tourFits,
-  type Place,
-  type PlaceArea,
-  type PlaceFilter,
-  type PlacesData,
-} from '@/lib/places';
+  DEFAULT_GUIDE_FILTER,
+  EMPTY_MY_PLACES,
+  GUIDE_FESTIVALS,
+  GUIDE_PLACES,
+  GUIDE_TOURS,
+  SEASON_LABEL,
+  filterGuide,
+  groupByArea,
+  importMarksFromMemo,
+  loadMyPlaces,
+  makeCustomPlace,
+  placeArea,
+  regionOf,
+  saveMyPlaces,
+  seasonOf,
+  setMark,
+  type GuideFilter,
+  type GuidePlace,
+  type MarkFilter,
+  type MyPlaces,
+  type PlaceMark,
+  type Region,
+} from '@/lib/placeGuide';
 
-type Tab = 'places' | 'tours' | 'months';
+type Tab = 'places' | 'tours' | 'festivals';
 
 const chip = (on: boolean) =>
-  `px-3.5 py-1.5 rounded-full text-sm font-medium ${
+  `shrink-0 px-3.5 py-1.5 rounded-full text-sm font-medium ${
     on ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
   }`;
 
-const FILTERS: Array<{ value: PlaceFilter; label: string }> = [
-  { value: 'all', label: '전체' },
-  { value: 'todo', label: '가 볼 곳' },
-  { value: 'visited', label: '가 본 곳' },
-  { value: 'revisit', label: '☆ 또 갈 곳' },
-  { value: 'kidNotYet', label: '◇ 아이는 아직' },
+const REGIONS: Array<[Region | '', string]> = [
+  ['', '전체'],
+  ['seoul', '서울'],
+  ['metro', '경기·인천'],
+  ['other', '그 밖'],
 ];
 
-const FORMAT_HELP = `강서 : 가볼곳1 가볼곳2 / 가본곳 ☆또갈곳 ◇아이는안가본곳
-종로 : 국립기상박물관 / ☆경찰박물관 경복궁
---------          ← 아래부터 근교·지방
-파주 : 뮤지엄헤이 / 헤이리마을
-초1 : 어묵체험 방송국체험     ← 나이 제한 견학
-----              ← 아래부터 달마다 열리는 축제
-5월 중랑장미 고양꽃박람회`;
+const MARKS: Array<[MarkFilter, string]> = [
+  ['all', '전체'],
+  ['notVisited', '안 가 본 곳'],
+  ['want', '가 보고 싶은 곳'],
+  ['visited', '가 본 곳'],
+  ['revisit', '또 갈 곳'],
+];
 
 export default function PlacesPage() {
   const router = useRouter();
   const { isAuthenticated, isLoading } = useAuthStore();
-  const [data, setData] = useState<PlacesData>(EMPTY_PLACES);
-  const [children, setChildren] = useState<Child[]>([]);
+  const [mine, setMine] = useState<MyPlaces>(EMPTY_MY_PLACES);
+  const [kids, setKids] = useState<Child[]>([]);
   const [tab, setTab] = useState<Tab>('places');
-  const [filter, setFilter] = useState<PlaceFilter>('all');
-  const [area, setArea] = useState<PlaceArea | ''>('');
-  const [search, setSearch] = useState('');
-  const [editing, setEditing] = useState<Place | 'new' | null>(null);
+  const [filter, setFilter] = useState<GuideFilter>(DEFAULT_GUIDE_FILTER);
+  const [open, setOpen] = useState<GuidePlace | null>(null);
+  const [adding, setAdding] = useState(false);
   const [importing, setImporting] = useState(false);
+  const today = useMemo(() => new Date(), []);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) router.push('/login');
   }, [isAuthenticated, isLoading, router]);
 
   useEffect(() => {
-    setData(loadPlaces());
-    setChildren(getChildren());
+    setMine(loadMyPlaces());
+    setKids(getChildren());
   }, []);
 
-  const update = (next: PlacesData) => {
-    savePlaces(next);
-    setData(next);
+  const save = (next: MyPlaces) => {
+    saveMyPlaces(next);
+    setMine(next);
   };
+  const set = (patch: Partial<GuideFilter>) => setFilter((f) => ({ ...f, ...patch }));
 
-  const counts = useMemo(
-    () => ({
-      visited: data.places.filter((p) => p.visited).length,
-      todo: data.places.filter((p) => !p.visited).length,
-      revisit: data.places.filter((p) => p.revisit).length,
-    }),
-    [data.places]
+  const allPlaces = useMemo(() => [...GUIDE_PLACES, ...mine.custom], [mine.custom]);
+  const shown = useMemo(
+    () => filterGuide(allPlaces, mine.marks, filter, today),
+    [allPlaces, mine.marks, filter, today]
   );
+  const groups = useMemo(() => groupByArea(shown), [shown]);
 
-  const groups = useMemo(() => {
-    const q = search.trim().replace(/\s/g, '').toLowerCase();
-    const shown = data.places.filter(
-      (p) =>
-        matchesPlaceFilter(p, filter) &&
-        (!area || p.area === area) &&
-        (!q || `${p.region}${p.name}${p.memo ?? ''}`.replace(/\s/g, '').toLowerCase().includes(q))
-    );
-    return groupByRegion(shown);
-  }, [data.places, filter, area, search]);
-
-  const regions = useMemo(() => [...new Set(data.places.map((p) => p.region))], [data.places]);
-  const isEmpty = !data.places.length && !data.tours.length && !data.months.length;
-  const thisMonth = new Date().getMonth() + 1;
+  const areas = useMemo(
+    () =>
+      groupByArea(
+        allPlaces.filter((p) => !filter.region || regionOf(p.sido) === filter.region)
+      ).map((g) => g.area),
+    [allPlaces, filter.region]
+  );
+  const categories = useMemo(
+    () => PLACE_CATEGORIES.filter((c) => c !== '기타' && allPlaces.some((p) => p.category === c)),
+    [allPlaces]
+  );
+  const visitedCount = Object.values(mine.marks).filter((m) => m.visited).length;
+  const revisitCount = Object.values(mine.marks).filter((m) => m.revisit).length;
+  const season = seasonOf(today);
 
   return (
     <MainLayout>
       <div className="max-w-3xl mx-auto">
-        <div className="flex items-start justify-between gap-3 mb-5">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">내 장소</h1>
-            <p className="text-gray-600 mt-1">가 본 곳, 가 볼 곳, 또 갈 곳을 모아 두는 노트</p>
-          </div>
-          <div className="flex gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => setImporting(true)}
-              className="p-2.5 rounded-xl bg-gray-100 text-gray-700 hover:bg-gray-200"
-              title="메모 붙여넣기"
-              aria-label="메모 붙여넣기"
-            >
-              <FiClipboard size={18} />
-            </button>
-            <button
-              type="button"
-              onClick={() => setEditing('new')}
-              className="p-2.5 rounded-xl bg-blue-600 text-white hover:bg-blue-700"
-              title="장소 추가"
-              aria-label="장소 추가"
-            >
-              <FiPlus size={18} />
-            </button>
-          </div>
-        </div>
-
-        {isEmpty ? (
-          <div className="bg-white rounded-2xl border border-gray-200 p-6 text-center">
-            <p className="font-semibold text-gray-900">아직 적어 둔 곳이 없어요</p>
-            <p className="text-sm text-gray-600 mt-1">
-              메모장에 정리해 둔 목록이 있으면 그대로 붙여넣으세요. 지역·가 본 곳·☆ 표시를 알아서
-              나눠요.
-            </p>
-            <div className="flex justify-center gap-2 mt-5">
-              <button type="button" onClick={() => setImporting(true)} className="btn-primary">
-                메모 붙여넣기
-              </button>
-              <button type="button" onClick={() => setEditing('new')} className="btn-secondary">
-                하나씩 추가
-              </button>
-            </div>
-          </div>
-        ) : (
-          <>
-            <div role="tablist" className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-gray-100 mb-5">
-              {(
-                [
-                  ['places', `장소 ${data.places.length}`],
-                  ['tours', `견학 ${data.tours.length}`],
-                  ['months', '축제 달력'],
-                ] as Array<[Tab, string]>
-              ).map(([value, label]) => (
-                <button
-                  key={value}
-                  role="tab"
-                  aria-selected={tab === value}
-                  onClick={() => setTab(value)}
-                  className={`py-2 rounded-lg text-sm font-semibold ${
-                    tab === value ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600'
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            {tab === 'places' && (
+        <div className="mb-5">
+          <h1 className="text-3xl font-bold text-gray-900">가볼 만한 곳</h1>
+          <p className="text-gray-600 mt-1">
+            아이와 다녀온 곳을 정리한 {GUIDE_PLACES.length}곳
+            {visitedCount > 0 && (
               <>
-                <div className="grid grid-cols-3 gap-2 mb-5">
-                  {[
-                    ['가 본 곳', counts.visited, 'visited'],
-                    ['가 볼 곳', counts.todo, 'todo'],
-                    ['또 갈 곳', counts.revisit, 'revisit'],
-                  ].map(([label, count, value]) => (
-                    <button
-                      key={value as string}
-                      type="button"
-                      onClick={() => setFilter(filter === value ? 'all' : (value as PlaceFilter))}
-                      className={`rounded-2xl p-3 text-left border ${
-                        filter === value ? 'border-blue-600 bg-blue-50' : 'border-gray-200 bg-white'
-                      }`}
-                    >
-                      <p className="text-xs text-gray-500">{label}</p>
-                      <p className="text-xl font-bold text-gray-900 tabular-nums">{count}</p>
-                    </button>
-                  ))}
-                </div>
-
-                <div className="relative mb-3">
-                  <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                  <input
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    placeholder="이름·지역·메모 검색"
-                    className="input-field pl-10"
-                  />
-                </div>
-                <div className="flex flex-wrap gap-2 mb-2">
-                  {FILTERS.map((f) => (
-                    <button
-                      key={f.value}
-                      type="button"
-                      onClick={() => setFilter(f.value)}
-                      className={chip(filter === f.value)}
-                    >
-                      {f.label}
-                    </button>
-                  ))}
-                </div>
-                <div className="flex flex-wrap gap-2 mb-6">
-                  {(
-                    [
-                      ['', '모든 지역'],
-                      ['seoul', '서울'],
-                      ['nearby', '근교·지방'],
-                    ] as Array<[PlaceArea | '', string]>
-                  ).map(([value, label]) => (
-                    <button
-                      key={value || 'all'}
-                      type="button"
-                      onClick={() => setArea(value)}
-                      className={chip(area === value)}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-
-                {groups.length === 0 ? (
-                  <p className="text-center text-gray-500 py-10">조건에 맞는 곳이 없어요</p>
-                ) : (
-                  <div className="space-y-5">
-                    {groups.map(({ region, places }) => (
-                      <section key={region}>
-                        <h2 className="text-base font-bold text-gray-900 mb-2">
-                          {region}{' '}
-                          <span className="text-gray-400 font-medium">{places.length}</span>
-                        </h2>
-                        <div className="flex flex-wrap gap-1.5">
-                          {places.map((p) => (
-                            <button
-                              key={p.id}
-                              type="button"
-                              onClick={() => setEditing(p)}
-                              className={`px-3 py-1.5 rounded-lg text-sm border ${
-                                p.visited
-                                  ? 'bg-gray-100 border-gray-100 text-gray-700'
-                                  : 'bg-white border-gray-200 text-gray-900'
-                              }`}
-                              title={p.memo}
-                            >
-                              {p.revisit && <span className="text-amber-500 mr-0.5">★</span>}
-                              {p.kidNotYet && <span className="text-blue-600 mr-0.5">◇</span>}
-                              {p.name}
-                            </button>
-                          ))}
-                        </div>
-                      </section>
-                    ))}
-                  </div>
-                )}
-                <p className="text-xs text-gray-500 mt-8">
-                  흰 칸은 가 볼 곳, 회색 칸은 가 본 곳이에요. 눌러서 바꾸거나 지도에서 볼 수 있어요.
-                </p>
+                {' '}
+                · 내가 가 본 곳 <b className="text-gray-900">{visitedCount}</b>
+                {revisitCount > 0 && <> · 또 갈 곳 {revisitCount}</>}
               </>
             )}
+          </p>
+        </div>
 
-            {tab === 'tours' && <ToursTab data={data} kids={children} onChange={update} />}
+        <div role="tablist" className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-gray-100 mb-5">
+          {(
+            [
+              ['places', '장소'],
+              ['tours', '나이별 견학'],
+              ['festivals', '축제 달력'],
+            ] as Array<[Tab, string]>
+          ).map(([value, label]) => (
+            <button
+              key={value}
+              role="tab"
+              aria-selected={tab === value}
+              onClick={() => setTab(value)}
+              className={`py-2 rounded-lg text-sm font-semibold ${
+                tab === value ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
-            {tab === 'months' && <MonthsTab data={data} thisMonth={thisMonth} onChange={update} />}
+        {tab === 'places' && (
+          <>
+            <div className="relative mb-3">
+              <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                value={filter.search}
+                onChange={(e) => set({ search: e.target.value })}
+                placeholder="이름·지역·종류 검색 (예: 과학관, 파주)"
+                className="input-field pl-10"
+              />
+            </div>
+
+            <div className="space-y-2 mb-5">
+              <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
+                {REGIONS.map(([value, label]) => (
+                  <button
+                    key={value || 'all'}
+                    type="button"
+                    onClick={() => set({ region: value, sigungu: '' })}
+                    className={chip(filter.region === value)}
+                  >
+                    {label}
+                  </button>
+                ))}
+                <select
+                  value={filter.sigungu}
+                  onChange={(e) => set({ sigungu: e.target.value })}
+                  className="shrink-0 rounded-full bg-gray-100 border-0 text-sm font-medium text-gray-700 pl-3.5 pr-8 py-1.5"
+                  aria-label="시군구"
+                >
+                  <option value="">시·군·구 전체</option>
+                  {areas.map((a) => (
+                    <option key={a} value={a}>
+                      {a}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
+                <button
+                  type="button"
+                  onClick={() => set({ category: '' })}
+                  className={chip(!filter.category)}
+                >
+                  모든 종류
+                </button>
+                {categories.map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => set({ category: filter.category === c ? '' : c })}
+                    className={chip(filter.category === c)}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+              <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
+                <button
+                  type="button"
+                  onClick={() => set({ indoor: !filter.indoor, outdoor: false })}
+                  className={chip(filter.indoor)}
+                >
+                  실내 (비 오는 날)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => set({ outdoor: !filter.outdoor, indoor: false })}
+                  className={chip(filter.outdoor)}
+                >
+                  야외
+                </button>
+                <button
+                  type="button"
+                  onClick={() => set({ thisSeason: !filter.thisSeason })}
+                  className={chip(filter.thisSeason)}
+                >
+                  {SEASON_LABEL[season]}에 좋은 곳
+                </button>
+                <button
+                  type="button"
+                  onClick={() => set({ night: !filter.night })}
+                  className={chip(filter.night)}
+                >
+                  야경·밤
+                </button>
+              </div>
+              <div className="flex gap-2 overflow-x-auto pb-1 -mx-4 px-4">
+                {MARKS.map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => set({ mark: value })}
+                    className={chip(filter.mark === value)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm text-gray-600">
+                <b className="text-gray-900 tabular-nums">{shown.length}</b>곳
+              </p>
+              {JSON.stringify(filter) !== JSON.stringify(DEFAULT_GUIDE_FILTER) && (
+                <button
+                  type="button"
+                  onClick={() => setFilter(DEFAULT_GUIDE_FILTER)}
+                  className="text-sm text-blue-600 font-medium"
+                >
+                  조건 지우기
+                </button>
+              )}
+            </div>
+
+            {groups.length === 0 ? (
+              <p className="text-center text-gray-500 py-12">조건에 맞는 곳이 없어요</p>
+            ) : (
+              <div className="space-y-6">
+                {groups.map(({ area, places }) => (
+                  <section key={area}>
+                    <h2 className="text-sm font-semibold text-gray-500 mb-2">
+                      {area} <span className="text-gray-400">{places.length}</span>
+                    </h2>
+                    <ul className="bg-white rounded-2xl border border-gray-200 divide-y divide-gray-100">
+                      {places.map((p) => (
+                        <PlaceRow
+                          key={p.id}
+                          place={p}
+                          mark={mine.marks[p.id]}
+                          onOpen={() => setOpen(p)}
+                        />
+                      ))}
+                    </ul>
+                  </section>
+                ))}
+              </div>
+            )}
+
+            <div className="flex flex-col items-center gap-2 mt-8">
+              <button
+                type="button"
+                onClick={() => setAdding(true)}
+                className="btn-secondary inline-flex items-center gap-1.5"
+              >
+                <FiPlus /> 목록에 없는 곳 추가
+              </button>
+              <button
+                type="button"
+                onClick={() => setImporting(true)}
+                className="text-xs text-gray-500 underline"
+              >
+                예전 메모에서 가 본 곳 표시 가져오기
+              </button>
+            </div>
           </>
         )}
+
+        {tab === 'tours' && <ToursTab kids={kids} today={today} />}
+        {tab === 'festivals' && <FestivalsTab today={today} />}
       </div>
 
-      {editing && (
+      {open && (
         <PlaceSheet
-          place={editing === 'new' ? null : editing}
-          regions={regions}
-          onClose={() => setEditing(null)}
-          onSave={(place) => {
-            const exists = data.places.some((p) => p.id === place.id);
-            update({
-              ...data,
-              places: exists
-                ? data.places.map((p) => (p.id === place.id ? place : p))
-                : [...data.places, place],
-            });
-            setEditing(null);
-          }}
-          onDelete={(id) => {
-            update({ ...data, places: data.places.filter((p) => p.id !== id) });
-            setEditing(null);
+          place={open}
+          mark={mine.marks[open.id] ?? {}}
+          onClose={() => setOpen(null)}
+          onMark={(mark) => save(setMark(mine, open.id, mark))}
+          onDelete={
+            open.custom
+              ? () => {
+                  save(
+                    setMark(
+                      { ...mine, custom: mine.custom.filter((c) => c.id !== open.id) },
+                      open.id,
+                      {}
+                    )
+                  );
+                  setOpen(null);
+                }
+              : undefined
+          }
+        />
+      )}
+      {adding && (
+        <AddSheet
+          onClose={() => setAdding(false)}
+          onAdd={(place) => {
+            save({ ...mine, custom: [...mine.custom, place] });
+            setAdding(false);
           }}
         />
       )}
-
       {importing && (
         <ImportSheet
-          hasData={!isEmpty}
           onClose={() => setImporting(false)}
-          onImport={(parsed, replace) => {
-            update(replace ? parsed : mergePlaces(data, parsed));
-            setImporting(false);
-            setTab('places');
+          onImport={(text) => {
+            const result = importMarksFromMemo(mine, text);
+            save(result.data);
+            return result;
           }}
         />
       )}
@@ -311,217 +360,173 @@ export default function PlacesPage() {
   );
 }
 
-// ── 견학 ─────────────────────────────────────────────────────
-
-function ToursTab({
-  data,
-  kids,
-  onChange,
+function PlaceRow({
+  place,
+  mark,
+  onOpen,
 }: {
-  data: PlacesData;
-  kids: Child[];
-  onChange: (next: PlacesData) => void;
+  place: GuidePlace;
+  mark?: PlaceMark;
+  onOpen: () => void;
 }) {
-  const [name, setName] = useState('');
-  const [label, setLabel] = useState('');
-  const today = new Date();
+  const tags = [
+    place.indoor && !place.outdoor ? '실내' : place.outdoor && !place.indoor ? '야외' : '실내·야외',
+    ...place.seasons.map((s) => SEASON_LABEL[s]),
+    place.night ? '야경' : '',
+    place.weekdayOnly ? '평일' : '',
+  ].filter(Boolean);
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onOpen}
+        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-gray-50"
+      >
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-gray-900 truncate">
+            {place.name}
+            {place.custom && (
+              <span className="ml-1.5 text-xs font-medium text-gray-500">내가 추가</span>
+            )}
+          </p>
+          <p className="text-sm text-gray-500 truncate">
+            {place.category !== '기타' && <span>{place.category}</span>}
+            {place.category !== '기타' && tags.length > 0 && ' · '}
+            {tags.join(' · ')}
+            {place.note && ` · ${place.note}`}
+          </p>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {mark?.revisit ? (
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-1 rounded-md">
+              <FiStar size={12} /> 또 갈 곳
+            </span>
+          ) : mark?.visited ? (
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md">
+              <FiCheck size={12} /> 가 봄
+            </span>
+          ) : mark?.want ? (
+            <FiHeart className="text-red-600" size={16} aria-label="가 보고 싶은 곳" />
+          ) : null}
+        </div>
+      </button>
+    </li>
+  );
+}
+
+// ── 나이별 견학 ─────────────────────────────────────────────
+
+function ToursTab({ kids, today }: { kids: Child[]; today: Date }) {
   const names = kids.map((k, i) => k.name || defaultChildName(i));
-  const labels = [...new Set(data.tours.map((t) => t.label))];
-
-  const add = () => {
-    if (!name.trim() || !label.trim()) return;
-    onChange({
-      ...data,
-      tours: [
-        ...data.tours,
-        {
-          id: `t-${Date.now()}`,
-          name: name.trim(),
-          label: label.trim(),
-          rule: parseAgeRule(label),
-        },
-      ],
-    });
-    setName('');
-  };
-
+  const labels = [...new Set(GUIDE_TOURS.map((t) => t.label))];
   return (
     <div className="space-y-5">
-      {labels.map((l) => (
-        <section key={l}>
-          <h2 className="text-base font-bold text-gray-900 mb-2">{l}</h2>
+      <p className="text-sm text-gray-600">
+        공장·기관 견학은 나이 제한이 있는 곳이 많아요. 예약 조건은 바뀔 수 있으니 신청 전에
+        확인하세요.
+      </p>
+      {kids.length === 0 && (
+        <p className="text-sm text-gray-600 bg-gray-100 rounded-xl p-3">
+          <Link href="/profile" className="text-blue-600 font-medium">
+            프로필
+          </Link>
+          에 아이 생일을 넣으면 아이마다 갈 수 있는지 알려 줘요.
+        </p>
+      )}
+      {labels.map((label) => (
+        <section key={label}>
+          <h2 className="text-sm font-semibold text-gray-500 mb-2">{label}</h2>
           <ul className="bg-white rounded-2xl border border-gray-200 divide-y divide-gray-100">
-            {data.tours
-              .filter((t) => t.label === l)
-              .map((t) => (
-                <li key={t.id} className="flex items-start gap-3 px-4 py-3">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900">{t.name}</p>
-                    {kids.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mt-1.5">
-                        {tourFits(t.rule, kids, today, names).map((fit) => (
-                          <span
-                            key={fit.childName}
-                            className={`badge ${fit.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}
-                          >
-                            {fit.childName} {fit.ok ? '가능' : (fit.from ?? '지남')}
-                          </span>
-                        ))}
-                      </div>
+            {GUIDE_TOURS.filter((t) => t.label === label).map((t) => (
+              <li key={t.id} className="px-4 py-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-gray-900">{t.name}</p>
+                    {(t.sido || t.note) && (
+                      <p className="text-sm text-gray-500">
+                        {[t.sido, t.note].filter(Boolean).join(' · ')}
+                      </p>
                     )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onChange({ ...data, tours: data.tours.filter((x) => x.id !== t.id) })
-                    }
-                    className="p-1.5 text-gray-400 hover:text-red-600"
-                    aria-label={`${t.name} 지우기`}
+                  <a
+                    href={`https://search.naver.com/search.naver?query=${encodeURIComponent(`${t.name} 예약`)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 text-sm text-blue-600 font-medium"
                   >
-                    <FiTrash2 size={16} />
-                  </button>
-                </li>
-              ))}
+                    예약 찾기
+                  </a>
+                </div>
+                {kids.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {tourFits(t.rule, kids, today, names).map((fit) => (
+                      <span
+                        key={fit.childName}
+                        className={`badge ${fit.ok ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600'}`}
+                      >
+                        {fit.childName} {fit.ok ? '갈 수 있어요' : (fit.from ?? '나이 지남')}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </li>
+            ))}
           </ul>
         </section>
       ))}
-      {kids.length === 0 && data.tours.length > 0 && (
-        <p className="text-sm text-gray-500">
-          프로필에 아이 생일을 넣으면 아이마다 갈 수 있는지 보여 줘요.
-        </p>
-      )}
-      <div className="bg-white rounded-2xl border border-gray-200 p-4">
-        <p className="font-semibold text-gray-900 mb-3">견학 추가</p>
-        <div className="flex flex-col sm:flex-row gap-2">
-          <input
-            value={label}
-            onChange={(e) => setLabel(e.target.value)}
-            placeholder="나이 (초1, 6세, 모든연령)"
-            className="input-field sm:w-48"
-            list="tour-labels"
-          />
-          <datalist id="tour-labels">
-            {['모든연령', '6세', '초1', '초3', '초등', '중학생', ...labels].map((l) => (
-              <option key={l} value={l} />
-            ))}
-          </datalist>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="견학 이름"
-            className="input-field flex-1"
-            onKeyDown={(e) => e.key === 'Enter' && add()}
-          />
-          <button type="button" onClick={add} className="btn-primary shrink-0">
-            추가
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
 
-// ── 축제 달력 ────────────────────────────────────────────────
+// ── 축제 달력 ───────────────────────────────────────────────
 
-function MonthsTab({
-  data,
-  thisMonth,
-  onChange,
-}: {
-  data: PlacesData;
-  thisMonth: number;
-  onChange: (next: PlacesData) => void;
-}) {
-  const [month, setMonth] = useState(thisMonth);
-  const [name, setName] = useState('');
-  // 이번 달부터 한 바퀴
+function FestivalsTab({ today }: { today: Date }) {
+  const thisMonth = today.getMonth() + 1;
   const order = Array.from({ length: 12 }, (_, i) => ((thisMonth - 1 + i) % 12) + 1);
-
-  const add = () => {
-    if (!name.trim()) return;
-    onChange({
-      ...data,
-      months: [...data.months, { id: `m-${Date.now()}`, name: name.trim(), months: [month] }],
-    });
-    setName('');
-  };
-
   return (
     <div className="space-y-3">
+      <p className="text-sm text-gray-600">
+        해마다 열리는 축제를 달별로 모았어요. 정확한 날짜는{' '}
+        <Link href="/festivals" className="text-blue-600 font-medium">
+          축제 일정
+        </Link>
+        이나 공식 안내에서 확인하세요.
+      </p>
       {order.map((m) => {
-        const notes = data.months.filter((n) => n.months.includes(m));
-        if (!notes.length && m !== thisMonth) return null;
+        const list = GUIDE_FESTIVALS.filter((f) => f.months.includes(m));
+        if (!list.length) return null;
         return (
           <section
             key={m}
-            className={`rounded-2xl border p-4 ${
-              m === thisMonth ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-white'
-            }`}
+            className={`rounded-2xl border p-4 ${m === thisMonth ? 'border-blue-200 bg-blue-50' : 'border-gray-200 bg-white'}`}
           >
             <h2 className="text-base font-bold text-gray-900 mb-2">
-              {m}월{' '}
+              {m}월
               {m === thisMonth && (
-                <span className="text-blue-600 text-sm font-semibold ml-1">이번 달</span>
+                <span className="text-blue-600 text-sm font-semibold ml-2">이번 달</span>
               )}
             </h2>
-            {notes.length ? (
-              <div className="flex flex-wrap gap-1.5">
-                {notes.map((n) => (
-                  <span
-                    key={n.id}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-sm text-gray-900"
-                  >
-                    {n.name}
-                    {n.months.length > 1 && (
-                      <span className="text-gray-500 text-xs">
-                        {n.months[0]}~{n.months[n.months.length - 1]}월
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onChange({ ...data, months: data.months.filter((x) => x.id !== n.id) })
-                      }
-                      className="text-gray-400 hover:text-red-600"
-                      aria-label={`${n.name} 지우기`}
-                    >
-                      <FiX size={14} />
-                    </button>
+            <ul className="space-y-1.5">
+              {list.map((f) => (
+                <li key={f.id} className="flex items-baseline justify-between gap-3">
+                  <span className="font-medium text-gray-900">{f.name}</span>
+                  <span className="text-xs text-gray-500 text-right">
+                    {[
+                      f.sigungu || f.sido,
+                      f.months.length > 1
+                        ? `${f.months[0]}~${f.months[f.months.length - 1]}월`
+                        : '',
+                      f.note,
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
                   </span>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-gray-500">적어 둔 축제가 없어요</p>
-            )}
+                </li>
+              ))}
+            </ul>
           </section>
         );
       })}
-      <div className="bg-white rounded-2xl border border-gray-200 p-4">
-        <p className="font-semibold text-gray-900 mb-3">축제 추가</p>
-        <div className="flex gap-2">
-          <select
-            value={month}
-            onChange={(e) => setMonth(Number(e.target.value))}
-            className="input-field w-24"
-          >
-            {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-              <option key={m} value={m}>
-                {m}월
-              </option>
-            ))}
-          </select>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="축제 이름"
-            className="input-field flex-1"
-            onKeyDown={(e) => e.key === 'Enter' && add()}
-          />
-          <button type="button" onClick={add} className="btn-primary shrink-0">
-            추가
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
@@ -551,12 +556,12 @@ function Sheet({
     >
       <div className="absolute inset-0 bg-black/40" onClick={onClose} />
       <div className="relative w-full sm:max-w-lg max-h-[90vh] overflow-y-auto bg-white rounded-t-2xl sm:rounded-2xl p-5 pb-[calc(1.25rem+env(safe-area-inset-bottom))]">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-start justify-between gap-3 mb-4">
           <h2 className="text-lg font-bold text-gray-900">{title}</h2>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-gray-500 hover:text-gray-900"
+            className="p-1.5 -m-1.5 text-gray-500 hover:text-gray-900"
             aria-label="닫기"
           >
             <FiX size={20} />
@@ -568,202 +573,258 @@ function Sheet({
   );
 }
 
-function Toggle({
+function MarkButton({
+  on,
+  onClick,
+  icon,
   label,
-  hint,
-  checked,
-  onChange,
 }: {
+  on: boolean;
+  onClick: () => void;
+  icon: React.ReactNode;
   label: string;
-  hint?: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
 }) {
   return (
-    <label className="flex items-center justify-between gap-3 py-3 cursor-pointer">
-      <span>
-        <span className="block font-medium text-gray-900">{label}</span>
-        {hint && <span className="block text-xs text-gray-500">{hint}</span>}
-      </span>
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="w-5 h-5 accent-blue-600"
-      />
-    </label>
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      className={`flex flex-col items-center gap-1 py-3 rounded-xl text-sm font-medium ${
+        on ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
   );
 }
 
 function PlaceSheet({
   place,
-  regions,
+  mark,
   onClose,
-  onSave,
+  onMark,
   onDelete,
 }: {
-  place: Place | null;
-  regions: string[];
+  place: GuidePlace;
+  mark: PlaceMark;
   onClose: () => void;
-  onSave: (place: Place) => void;
-  onDelete: (id: string) => void;
+  onMark: (mark: PlaceMark) => void;
+  onDelete?: () => void;
 }) {
-  const [draft, setDraft] = useState<Place>(
-    place ?? createPlace({ name: '', region: regions[0] ?? '' })
-  );
-  const set = (patch: Partial<Place>) => setDraft((d) => ({ ...d, ...patch }));
-  const valid = draft.name.trim() && draft.region.trim();
-
+  const [memo, setMemo] = useState(mark.memo ?? '');
+  const update = (patch: PlaceMark) => onMark({ ...mark, ...patch });
   return (
-    <Sheet title={place ? place.name : '장소 추가'} onClose={onClose}>
-      <div className="space-y-3">
-        <input
-          value={draft.name}
-          onChange={(e) => set({ name: e.target.value })}
-          placeholder="이름"
-          className="input-field"
-        />
-        <input
-          value={draft.region}
-          onChange={(e) => set({ region: e.target.value })}
-          placeholder="지역 (강서, 파주 …)"
-          className="input-field"
-          list="place-regions"
-        />
-        <datalist id="place-regions">
-          {regions.map((r) => (
-            <option key={r} value={r} />
-          ))}
-        </datalist>
-      </div>
-      <div className="divide-y divide-gray-100 my-2">
-        <Toggle
+    <Sheet title={place.name} onClose={onClose}>
+      <p className="text-sm text-gray-600 -mt-2 mb-4">
+        {[placeArea(place), place.category !== '기타' ? place.category : '', place.note]
+          .filter(Boolean)
+          .join(' · ')}
+      </p>
+      <div className="grid grid-cols-3 gap-2 mb-3">
+        <MarkButton
+          on={Boolean(mark.visited)}
+          onClick={() =>
+            update({
+              visited: !mark.visited,
+              want: mark.visited ? mark.want : undefined,
+              revisit: mark.visited ? undefined : mark.revisit,
+            })
+          }
+          icon={<FiCheck size={18} />}
           label="가 봤어요"
-          checked={draft.visited}
-          onChange={(v) => set({ visited: v, revisit: v && draft.revisit })}
         />
-        <Toggle
-          label="☆ 또 갈 곳"
-          hint="아이가 크면 다시 가고 싶은 곳"
-          checked={draft.revisit}
-          onChange={(v) => set({ revisit: v, visited: v || draft.visited })}
+        <MarkButton
+          on={Boolean(mark.revisit)}
+          onClick={() =>
+            update({
+              revisit: !mark.revisit,
+              visited: !mark.revisit ? true : mark.visited,
+              want: undefined,
+            })
+          }
+          icon={<FiStar size={18} />}
+          label="또 갈래요"
         />
-        <Toggle
-          label="◇ 아이는 아직"
-          hint="어른만 가 본 곳"
-          checked={draft.kidNotYet}
-          onChange={(v) => set({ kidNotYet: v })}
+        <MarkButton
+          on={Boolean(mark.want)}
+          onClick={() => update({ want: !mark.want })}
+          icon={<FiHeart size={18} />}
+          label="가 보고 싶어요"
         />
       </div>
+      <label className="flex items-center justify-between gap-3 py-2 mb-2 cursor-pointer">
+        <span className="text-sm text-gray-700">어른만 가 봤어요 (아이는 아직)</span>
+        <input
+          type="checkbox"
+          checked={Boolean(mark.kidNotYet)}
+          onChange={(e) => update({ kidNotYet: e.target.checked || undefined })}
+          className="w-5 h-5 accent-blue-600"
+        />
+      </label>
       <textarea
-        value={draft.memo ?? ''}
-        onChange={(e) => set({ memo: e.target.value || undefined })}
-        placeholder="메모 (예: 평일만, 예약 필수)"
+        value={memo}
+        onChange={(e) => setMemo(e.target.value)}
+        onBlur={() => update({ memo: memo.trim() || undefined })}
+        placeholder="내 메모 (예: 둘째가 크면 다시, 주차 편함)"
         rows={2}
         className="input-field resize-none mb-4"
       />
       <div className="flex gap-2">
-        {place && (
-          <>
-            <a
-              href={mapSearchUrl(draft)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-secondary inline-flex items-center gap-1.5"
-            >
-              <FiMapPin size={16} /> 지도
-            </a>
-            <button
-              type="button"
-              onClick={() =>
-                window.confirm(`'${place.name}'을(를) 지울까요?`) && onDelete(place.id)
-              }
-              className="btn-ghost text-red-600"
-              aria-label="지우기"
-            >
-              <FiTrash2 size={16} />
-            </button>
-          </>
-        )}
-        <button
-          type="button"
-          disabled={!valid}
-          onClick={() =>
-            onSave({
-              ...draft,
-              name: draft.name.trim(),
-              region: draft.region.trim(),
-              area: place ? draft.area : createPlace(draft).area,
-            })
-          }
-          className="btn-primary flex-1"
+        <a
+          href={mapSearchUrl({ name: place.name, region: place.sigungu || place.sido })}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn-primary flex-1 inline-flex items-center justify-center gap-1.5"
         >
-          저장
-        </button>
+          <FiMapPin size={16} /> 지도에서 보기
+        </a>
+        {onDelete && (
+          <button
+            type="button"
+            onClick={() => window.confirm(`'${place.name}'을(를) 지울까요?`) && onDelete()}
+            className="btn-secondary text-red-600"
+            aria-label="지우기"
+          >
+            <FiTrash2 size={16} />
+          </button>
+        )}
       </div>
     </Sheet>
   );
 }
 
+const SIDO_LIST = [
+  '서울',
+  '경기',
+  '인천',
+  '강원',
+  '충북',
+  '충남',
+  '대전',
+  '세종',
+  '전북',
+  '전남',
+  '광주',
+  '경북',
+  '경남',
+  '대구',
+  '울산',
+  '부산',
+  '제주',
+];
+
+function AddSheet({ onClose, onAdd }: { onClose: () => void; onAdd: (place: GuidePlace) => void }) {
+  const [name, setName] = useState('');
+  const [sido, setSido] = useState('서울');
+  const [sigungu, setSigungu] = useState('');
+  const [category, setCategory] = useState<PlaceCategory>('체험');
+  const [note, setNote] = useState('');
+  return (
+    <Sheet title="목록에 없는 곳 추가" onClose={onClose}>
+      <div className="space-y-3 mb-4">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="이름"
+          className="input-field"
+          autoFocus
+        />
+        <div className="flex gap-2">
+          <select
+            value={sido}
+            onChange={(e) => setSido(e.target.value)}
+            className="input-field w-28"
+          >
+            {SIDO_LIST.map((s) => (
+              <option key={s}>{s}</option>
+            ))}
+          </select>
+          <input
+            value={sigungu}
+            onChange={(e) => setSigungu(e.target.value)}
+            placeholder="시·군·구 (예: 마포구)"
+            className="input-field flex-1"
+          />
+        </div>
+        <select
+          value={category}
+          onChange={(e) => setCategory(e.target.value as PlaceCategory)}
+          className="input-field"
+        >
+          {PLACE_CATEGORIES.map((c) => (
+            <option key={c}>{c}</option>
+          ))}
+        </select>
+        <input
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="한 줄 설명 (선택)"
+          className="input-field"
+        />
+      </div>
+      <button
+        type="button"
+        disabled={!name.trim()}
+        onClick={() => onAdd(makeCustomPlace({ name, sido, sigungu, category, note }))}
+        className="btn-primary w-full"
+      >
+        추가
+      </button>
+    </Sheet>
+  );
+}
+
 function ImportSheet({
-  hasData,
   onClose,
   onImport,
 }: {
-  hasData: boolean;
   onClose: () => void;
-  onImport: (data: PlacesData, replace: boolean) => void;
+  onImport: (text: string) => { matched: number; unmatched: string[] };
 }) {
   const [text, setText] = useState('');
-  const parsed = useMemo(() => parsePlacesText(text), [text]);
-  const total = parsed.places.length + parsed.tours.length + parsed.months.length;
-
+  const [result, setResult] = useState<{ matched: number; unmatched: string[] } | null>(null);
   return (
-    <Sheet title="메모 붙여넣기" onClose={onClose}>
-      <p className="text-sm text-gray-600 mb-2">
-        메모장에 정리한 글을 그대로 붙여넣으세요. 이런 형식을 읽어요.
-      </p>
-      <pre className="text-xs bg-gray-50 border border-gray-200 rounded-xl p-3 mb-3 whitespace-pre-wrap text-gray-700">
-        {FORMAT_HELP}
-      </pre>
-      <textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        rows={8}
-        placeholder="여기에 붙여넣기"
-        className="input-field mb-3"
-        autoFocus
-      />
-      {text.trim() && (
-        <p className="text-sm text-gray-700 mb-3">
-          장소 <b>{parsed.places.length}</b>곳 (가 본 곳{' '}
-          {parsed.places.filter((p) => p.visited).length}) · 견학 <b>{parsed.tours.length}</b> ·
-          축제 <b>{parsed.months.length}</b>
-        </p>
-      )}
-      <div className="flex gap-2">
-        {hasData && (
+    <Sheet title="예전 메모에서 표시 가져오기" onClose={onClose}>
+      {result ? (
+        <div className="space-y-3">
+          <p className="text-gray-900">
+            <b>{result.matched}</b>곳에 표시를 붙였어요.
+          </p>
+          {result.unmatched.length > 0 && (
+            <p className="text-sm text-gray-600">
+              목록에서 못 찾은 곳 {result.unmatched.length}개:{' '}
+              {result.unmatched.slice(0, 12).join(', ')}
+              {result.unmatched.length > 12 && ' …'}
+            </p>
+          )}
+          <button type="button" onClick={onClose} className="btn-primary w-full">
+            확인
+          </button>
+        </div>
+      ) : (
+        <>
+          <p className="text-sm text-gray-600 mb-3">
+            &lsquo;지역 : 가 볼 곳 / 가 본 곳&rsquo;, ☆(또 갈 곳)·◇(어른만) 표시로 적어 둔 메모가
+            있으면 붙여넣으세요. 목록의 같은 곳에 가 본 곳·또 갈 곳 표시만 옮겨요.
+          </p>
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={8}
+            placeholder="여기에 붙여넣기"
+            className="input-field mb-3"
+          />
           <button
             type="button"
-            disabled={!total}
-            onClick={() =>
-              window.confirm('지금 적어 둔 내용을 모두 지우고 바꿀까요?') && onImport(parsed, true)
-            }
-            className="btn-secondary"
+            disabled={!text.trim()}
+            onClick={() => setResult(onImport(text))}
+            className="btn-primary w-full"
           >
-            모두 바꾸기
+            표시 가져오기
           </button>
-        )}
-        <button
-          type="button"
-          disabled={!total}
-          onClick={() => onImport(parsed, false)}
-          className="btn-primary flex-1"
-        >
-          {hasData ? '더하기' : '가져오기'}
-        </button>
-      </div>
-      <p className="text-xs text-gray-500 mt-3">잘못 나뉜 이름은 가져온 뒤 눌러서 고치면 돼요.</p>
+        </>
+      )}
     </Sheet>
   );
 }
