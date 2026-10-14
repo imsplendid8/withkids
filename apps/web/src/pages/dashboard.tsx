@@ -8,7 +8,7 @@ import { MainLayout } from '@/components/layouts/MainLayout';
 import { CrawlStatusPanel } from '@/components/CrawlStatusPanel';
 import { dDayLabel, daysFromToday, formatMonthDay, formatTime } from '@/lib/bookingDates';
 import { FiBookmark, FiClock, FiExternalLink, FiMapPin } from 'react-icons/fi';
-import { loadPlaces, upcomingMonthNotes, type PlacesData } from '@/lib/places';
+import { festivalsInMonth, loadMyPlaces, type MyPlaces } from '@/lib/placeGuide';
 
 interface ScheduleRun {
   id: string;
@@ -29,10 +29,10 @@ export default function DashboardPage() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading } = useAuthStore();
   const { bookmarks, hydrate: hydrateBookmarks } = useBookmarkStore();
-  const [myPlaces, setMyPlaces] = useState<PlacesData | null>(null);
+  const [myPlaces, setMyPlaces] = useState<MyPlaces | null>(null);
 
   useEffect(() => {
-    setMyPlaces(loadPlaces());
+    setMyPlaces(loadMyPlaces());
   }, []);
 
   const [schedule, setSchedule] = useState<ScheduleRun[]>([]);
@@ -97,9 +97,7 @@ export default function DashboardPage() {
         </section>
 
         {/* 내 장소: 이번 달·다음 달 축제 메모 */}
-        {myPlaces && (myPlaces.months.length > 0 || myPlaces.places.length > 0) && (
-          <MonthNotesCard data={myPlaces} today={today} />
-        )}
+        {myPlaces && <MonthNotesCard data={myPlaces} today={today} />}
 
         {/* 접수 일정 */}
         <section className="bg-white rounded-lg shadow p-6">
@@ -232,38 +230,42 @@ function ScheduleItem({ run }: { run: ScheduleRun }) {
   );
 }
 
-function MonthNotesCard({ data, today }: { data: PlacesData; today: Date }) {
-  const upcoming = upcomingMonthNotes(data.months, today);
-  const revisit = data.places.filter((p) => p.revisit).length;
+function MonthNotesCard({ data, today }: { data: MyPlaces; today: Date }) {
+  const thisMonth = today.getMonth() + 1;
+  const months = [thisMonth, (thisMonth % 12) + 1];
+  const revisit = Object.values(data.marks).filter((m) => m.revisit).length;
   return (
     <section className="bg-white rounded-2xl border border-gray-200 p-5">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-lg font-bold text-gray-900">내 축제 메모</h2>
+        <h2 className="text-lg font-bold text-gray-900">이번 달 축제</h2>
         <Link
           href="/places"
           className="text-sm font-medium text-blue-600 inline-flex items-center gap-1"
         >
-          <FiMapPin size={14} /> 내 장소
+          <FiMapPin size={14} /> 가볼 만한 곳
         </Link>
       </div>
       <div className="space-y-2">
-        {upcoming.map(({ month, notes }) => (
-          <div key={month} className="flex gap-3">
-            <span className="w-10 shrink-0 text-sm font-semibold text-gray-500 tabular-nums">
-              {month}월
-            </span>
-            <p className="text-sm text-gray-900">
-              {notes.length ? (
-                notes.map((n) => n.name).join(' · ')
-              ) : (
-                <span className="text-gray-400">없음</span>
-              )}
-            </p>
-          </div>
-        ))}
+        {months.map((month) => {
+          const list = festivalsInMonth(month);
+          return (
+            <div key={month} className="flex gap-3">
+              <span className="w-10 shrink-0 text-sm font-semibold text-gray-500 tabular-nums">
+                {month}월
+              </span>
+              <p className="text-sm text-gray-900">
+                {list.length ? (
+                  list.map((f) => f.name).join(' · ')
+                ) : (
+                  <span className="text-gray-400">없음</span>
+                )}
+              </p>
+            </div>
+          );
+        })}
       </div>
       {revisit > 0 && (
-        <p className="text-xs text-gray-500 mt-3">☆ 또 갈 곳 {revisit}곳을 적어 뒀어요</p>
+        <p className="text-xs text-gray-500 mt-3">또 갈 곳으로 표시한 곳 {revisit}곳</p>
       )}
     </section>
   );

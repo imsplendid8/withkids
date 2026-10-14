@@ -1,13 +1,4 @@
-import {
-  mapSearchUrl,
-  matchesPlaceFilter,
-  mergePlaces,
-  parseAgeRule,
-  parsePlacesText,
-  splitNames,
-  tourFits,
-  upcomingMonthNotes,
-} from '../places';
+import { mapSearchUrl, parseAgeRule, parsePlacesText, splitNames, tourFits } from '../places';
 import type { Child } from '../eligibility';
 
 const SAMPLE = `가본곳은 지역명 a / b 중 b 오른쪽
@@ -33,7 +24,7 @@ const SAMPLE = `가본곳은 지역명 a / b 중 b 오른쪽
 춘천에어쇼 (5~7월)
 10월 여의도 불꽃 사천에어쇼`;
 
-describe('내 장소: 메모장 형식 읽기', () => {
+describe('메모장 형식 읽기', () => {
   const data = parsePlacesText(SAMPLE);
   const place = (name: string) => data.places.find((p) => p.name === name);
 
@@ -95,27 +86,12 @@ describe('내 장소: 메모장 형식 읽기', () => {
   });
 });
 
-describe('내 장소: 쓰기', () => {
+describe('메모 도우미', () => {
   it('& 로 이어진 이름과 띄어 쓴 괄호', () => {
     expect(splitNames('청년몰 & 실감형 어뮤즈스파 (진주)').map((t) => t.name)).toEqual([
       '청년몰 & 실감형',
       '어뮤즈스파 (진주)',
     ]);
-  });
-
-  it('다시 붙여넣으면 같은 곳은 합치고 새 곳만 더한다', () => {
-    const first = parsePlacesText('강서 : 서울식물원');
-    const second = parsePlacesText('강서 : / ☆서울식물원 항공박물관');
-    const merged = mergePlaces(first, second);
-    expect(merged.places).toHaveLength(2);
-    expect(merged.places[0]).toMatchObject({ name: '서울식물원', visited: true, revisit: true });
-  });
-
-  it('보기 필터', () => {
-    const [todo, star] = parsePlacesText('강서 : 깅꼬커피 / ☆서울식물원').places;
-    expect(matchesPlaceFilter(todo, 'todo')).toBe(true);
-    expect(matchesPlaceFilter(star, 'todo')).toBe(false);
-    expect(matchesPlaceFilter(star, 'revisit')).toBe(true);
   });
 
   it('지도 검색은 괄호 설명을 빼고 지역을 붙인다', () => {
@@ -140,13 +116,5 @@ describe('내 장소: 쓰기', () => {
       from: '2028년 3월부터',
     });
     expect(tourFits({ kind: 'age', min: 6 }, kids, today, ['첫째', '둘째'])[0].ok).toBe(true);
-  });
-
-  it('이번 달·다음 달 축제 메모', () => {
-    const { months } = parsePlacesText('----\n----\n10월 여의도 불꽃\n11월 김장축제\n5월 장미');
-    const [now, next] = upcomingMonthNotes(months, new Date(2026, 9, 11));
-    expect(now.notes.map((n) => n.name)).toEqual(['여의도 불꽃']);
-    expect(next).toMatchObject({ month: 11 });
-    expect(next.notes.map((n) => n.name)).toEqual(['김장축제']);
   });
 });
