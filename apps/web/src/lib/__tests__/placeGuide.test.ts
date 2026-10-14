@@ -23,7 +23,7 @@ describe('가볼 만한 곳 목록', () => {
     expect(new Set(ids).size).toBe(ids.length);
     for (const p of GUIDE_PLACES) {
       expect(PLACE_CATEGORIES).toContain(p.category);
-      expect(p.indoor || p.outdoor).toBe(true);
+      if (p.category !== '기타') expect(p.indoor || p.outdoor).toBe(true);
     }
     for (const f of GUIDE_FESTIVALS) for (const m of f.months) expect(m >= 1 && m <= 12).toBe(true);
     expect(GUIDE_TOURS.every((t) => t.name && t.label)).toBe(true);

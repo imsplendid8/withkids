@@ -104,8 +104,11 @@ function buildPlace(
 ): GuidePlace {
   const tags = tagText ? tagText.split(',').map((t) => t.trim()) : [];
   const indoorByCategory = INDOOR_CATEGORIES.includes(category);
-  const indoor = tags.includes('실내') || (!tags.includes('야외') && indoorByCategory);
-  const outdoor = tags.includes('야외') || (!tags.includes('실내') && !indoorByCategory);
+  // 종류를 모르는 곳(기타)은 실내·야외를 짐작하지 않는다
+  const unknown = category === '기타';
+  const indoor = tags.includes('실내') || (!unknown && !tags.includes('야외') && indoorByCategory);
+  const outdoor =
+    tags.includes('야외') || (!unknown && !tags.includes('실내') && !indoorByCategory);
   return {
     id: `${sido}|${sigungu}|${name}`,
     sido,
