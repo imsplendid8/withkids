@@ -335,3 +335,37 @@ export async function signOutCloud(): Promise<void> {
     suppressHook = false;
   }
 }
+
+/**
+ * 탈퇴: 계정에 저장한 데이터(users/{uid})와 구글 로그인 계정 연결, 이 브라우저의 데이터를 모두 지운다.
+ * 로그인한 지 오래되면 Firebase가 다시 로그인을 요구한다 → 확인 창을 띄우고 한 번 더 시도한다.
+ */
+export async function deleteAccount(): Promise<void> {
+  const { auth, db } = await connect();
+  const user = auth.currentUser;
+  if (!user) throw new Error('로그인한 상태에서만 탈퇴할 수 있어요.');
+  const { doc, deleteDoc } = await import('firebase/firestore');
+  const { deleteUser, reauthenticateWithPopup, GoogleAuthProvider } = await import('firebase/auth');
+
+  // 지우는 동안 남은 저장이 다시 올라가지 않게 한다
+  if (pushTimer) clearTimeout(pushTimer);
+  pushTimer = null;
+  stopWatchingRemote();
+  const uid = user.uid;
+  currentUid = null;
+
+  await deleteDoc(doc(db, 'users', uid));
+  try {
+    await deleteUser(user);
+  } catch (error) {
+    if ((error as { code?: string }).code !== 'auth/requires-recent-login') throw error;
+    await reauthenticateWithPopup(user, new GoogleAuthProvider());
+    await deleteUser(user);
+  }
+  suppressHook = true;
+  try {
+    clearLocal(window.localStorage);
+  } finally {
+    suppressHook = false;
+  }
+}

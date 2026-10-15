@@ -2,7 +2,8 @@ import type { Child } from './eligibility';
 
 /**
  * 아이 이름·생일. 참여 대상 필터가 쓴다.
- * 공개 저장소·서버에 올리지 않고 이 브라우저에만 저장한다 (백업 파일에는 포함).
+ * 이 브라우저에 저장하고, 구글 로그인을 쓰면 계정(Firestore users/{uid})에도 올라간다 (cloud.ts).
+ * 개인정보처리방침(pages/privacy.tsx)에 적힌 내용과 맞춰야 한다.
  */
 export const CHILDREN_KEY = 'withdkis.children';
 

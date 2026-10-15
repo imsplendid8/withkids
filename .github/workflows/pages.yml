@@ -5,10 +5,10 @@ name: GitHub Pages
 # - 프로그램 정보: 빌드할 때 서울시 API 등에서 수집해 data/programs.json 으로 넣는다
 # - 예약·후기·찜: 방문한 브라우저에 저장된다 (서버 없음)
 on:
+  # 실제 사이트는 main에서만 배포한다 (작업 브랜치는 PR의 CI로 확인)
   push:
     branches:
       - main
-      - claude/kids-experience-booking-tracker-pfuuqs
   # 매일 오전 6시(한국 시간)에 다시 수집해서 배포. schedule은 기본 브랜치(main)에 있는 파일만 실행된다.
   schedule:
     - cron: '0 21 * * *'

@@ -2,6 +2,7 @@ import React, { useRef, useState } from 'react';
 import { FiDownload, FiUpload } from 'react-icons/fi';
 import { exportLocalData, importLocalData } from '@/lib/localApi';
 import { toLocalYmd } from '@/lib/bookingDates';
+import { CLOUD_ENABLED } from '@/lib/cloud';
 
 /**
  * 정적 배포에서는 예약이 이 브라우저에만 저장된다.
@@ -12,7 +13,9 @@ export function DataBackupCard() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const handleExport = () => {
-    const blob = new Blob([JSON.stringify(exportLocalData(), null, 2)], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(exportLocalData(), null, 2)], {
+      type: 'application/json',
+    });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -26,11 +29,19 @@ export function DataBackupCard() {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
-    if (!window.confirm('지금 이 브라우저에 있는 예약·후기가 백업 파일 내용으로 바뀝니다. 계속할까요?')) return;
+    if (
+      !window.confirm(
+        '지금 이 브라우저에 있는 예약·후기가 백업 파일 내용으로 바뀝니다. 계속할까요?'
+      )
+    )
+      return;
 
     try {
       const { bookings } = importLocalData(JSON.parse(await file.text()));
-      setMessage({ type: 'success', text: `예약 ${bookings}건을 불러왔습니다. 화면을 새로고침합니다.` });
+      setMessage({
+        type: 'success',
+        text: `예약 ${bookings}건을 불러왔습니다. 화면을 새로고침합니다.`,
+      });
       setTimeout(() => window.location.reload(), 1200);
     } catch (error) {
       setMessage({
@@ -45,8 +56,9 @@ export function DataBackupCard() {
       <div>
         <h2 className="text-lg font-bold text-gray-900">내 데이터 백업</h2>
         <p className="text-sm text-gray-600 mt-1">
-          예약·후기·찜은 이 브라우저에만 저장됩니다. 휴대폰과 PC는 서로 공유되지 않아요. 브라우저 기록을
-          지우기 전이나 다른 기기로 옮길 때 백업 파일을 만들어 두세요.
+          {CLOUD_ENABLED
+            ? '예약·후기·찜은 로그인한 계정에 저장돼 휴대폰과 PC에서 같이 보여요. 따로 보관하고 싶으면 백업 파일을 만들어 두세요.'
+            : '예약·후기·찜은 이 브라우저에만 저장돼요. 브라우저 기록을 지우기 전이나 다른 기기로 옮길 때 백업 파일을 만들어 두세요.'}
         </p>
       </div>
 
@@ -73,7 +85,13 @@ export function DataBackupCard() {
           <FiUpload size={18} />
           백업 파일 불러오기
         </button>
-        <input ref={fileInput} type="file" accept="application/json,.json" onChange={handleImport} hidden />
+        <input
+          ref={fileInput}
+          type="file"
+          accept="application/json,.json"
+          onChange={handleImport}
+          hidden
+        />
       </div>
     </div>
   );

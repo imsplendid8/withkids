@@ -4,6 +4,7 @@ import { apiClient } from '@/lib/api';
 import { defaultChildName, getChildren, saveChildren } from '@/lib/children';
 import { childFacts, type Child } from '@/lib/eligibility';
 import { useAuthStore } from '@/store/authStore';
+import { CLOUD_ENABLED } from '@/lib/cloud';
 
 function describe(birthDate: string): string {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(birthDate)) return '';
@@ -77,8 +78,10 @@ export function ChildrenCard() {
       <div>
         <h3 className="text-lg font-semibold text-gray-900">우리 아이</h3>
         <p className="text-sm text-gray-600 mt-1">
-          생일을 넣으면 체험 날짜 기준 만 나이·학년으로 참여 가능 여부를 알려드려요. 이 정보는 이
-          브라우저에만 저장됩니다.
+          생일을 넣으면 체험 날짜 기준 만 나이·학년으로 참여 가능 여부를 알려드려요.{' '}
+          {CLOUD_ENABLED
+            ? '로그인한 구글 계정에 저장되고, 탈퇴하면 함께 지워져요.'
+            : '이 브라우저에만 저장돼요.'}
         </p>
       </div>
 
