@@ -7,10 +7,17 @@ const getDoc = jest.fn();
 const setDoc = jest.fn();
 const remote: { listener: ((snapshot: unknown) => void) | null } = { listener: null };
 const reload = jest.fn();
+const deleteDoc = jest.fn().mockResolvedValue(undefined);
+const deleteUser = jest.fn();
+const reauthenticateWithPopup = jest.fn().mockResolvedValue(undefined);
+const authObject: { currentUser: unknown } = { currentUser: null };
 
 jest.mock('firebase/app', () => ({ initializeApp: jest.fn(() => ({})) }));
 jest.mock('firebase/auth', () => ({
-  getAuth: jest.fn(() => ({})),
+  getAuth: jest.fn(() => authObject),
+  deleteUser: (...args: unknown[]) => deleteUser(...args),
+  reauthenticateWithPopup: (...args: unknown[]) => reauthenticateWithPopup(...args),
+  GoogleAuthProvider: jest.fn(),
   onAuthStateChanged: jest.fn((_auth, callback) => {
     authState.callback = callback;
   }),
@@ -22,6 +29,7 @@ jest.mock('firebase/firestore', () => ({
   doc: jest.fn((_db, _col, id) => ({ id })),
   getDoc: (...args: unknown[]) => getDoc(...args),
   setDoc: (...args: unknown[]) => setDoc(...args),
+  deleteDoc: (...args: unknown[]) => deleteDoc(...args),
   serverTimestamp: jest.fn(() => 'now'),
   onSnapshot: jest.fn((_ref, next) => {
     remote.listener = next;
@@ -32,6 +40,7 @@ jest.mock('firebase/firestore', () => ({
 import {
   PULL_FAILED_MESSAGE,
   UNSAVED_CHANGES_MESSAGE,
+  deleteAccount,
   setReloadHandlerForTest,
   signOutCloud,
   watchCloudUser,
@@ -161,5 +170,27 @@ describe('계정 동기화', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  it('탈퇴하면 계정 데이터·로그인 계정·이 브라우저 데이터를 지운다 (오래된 로그인은 다시 확인)', async () => {
+    getDoc.mockResolvedValue({ exists: () => true, data: () => ({ store: {} }) });
+    await authState.callback?.(user);
+    localStorage.setItem('withdkis.children', '[{"id":"a"}]');
+    authObject.currentUser = { uid: 'u1' };
+    deleteUser
+      .mockRejectedValueOnce(
+        Object.assign(new Error('old'), { code: 'auth/requires-recent-login' })
+      )
+      .mockResolvedValueOnce(undefined);
+
+    await deleteAccount();
+
+    expect(deleteDoc).toHaveBeenCalledWith({ id: 'u1' });
+    expect(reauthenticateWithPopup).toHaveBeenCalled();
+    expect(deleteUser).toHaveBeenCalledTimes(2);
+    expect(localStorage.getItem('withdkis.children')).toBeNull();
+    await new Promise((resolve) => setTimeout(resolve, 900));
+    expect(setDoc).not.toHaveBeenCalled();
+    authObject.currentUser = null;
   });
 });

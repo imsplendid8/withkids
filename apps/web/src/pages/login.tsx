@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useAuthStore, type User } from '@/store/authStore';
@@ -97,7 +98,18 @@ export default function LoginPage() {
             {isLoading || isAuthLoading ? '확인 중...' : '구글로 로그인'}
           </button>
           <p className="text-xs text-gray-500">
-            아이 정보·예약·찜은 내 계정에만 저장되고, 휴대폰과 PC에서 함께 볼 수 있어요.
+            아이 정보·예약·찜은 내 계정에 저장돼 휴대폰과 PC에서 함께 볼 수 있어요.
+          </p>
+          <p className="text-xs text-gray-500">
+            로그인하면{' '}
+            <Link href="/terms" className="underline">
+              이용약관
+            </Link>
+            과{' '}
+            <Link href="/privacy" className="underline font-semibold">
+              개인정보처리방침
+            </Link>
+            에 동의하게 돼요. 보호자(만 14세 이상)만 쓸 수 있어요.
           </p>
         </div>
       </div>

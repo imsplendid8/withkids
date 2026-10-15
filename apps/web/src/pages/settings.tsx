@@ -17,6 +17,8 @@ import { MainLayout, canLogout, logoutEverywhere } from '@/components/layouts/Ma
 import { MORE_LINKS } from '@/components/layouts/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { useDisplayStore } from '@/store/displayStore';
+import { CLOUD_ENABLED, deleteAccount } from '@/lib/cloud';
+import { isOperator, setOperator } from '@/lib/operator';
 import type { DisplaySettings } from '@/lib/display';
 
 interface Choice<T extends string> {
@@ -141,6 +143,36 @@ export default function SettingsPage() {
   const settings = useDisplayStore((state) => state.settings);
   const update = useDisplayStore((state) => state.update);
   const { canPrompt, installed, ios, install } = useInstall();
+  const [deleting, setDeleting] = useState(false);
+  const [operator, setOperatorState] = useState(false);
+
+  // 운영자 도구는 /settings?operator=1 로 한 번 켜 두면 이 기기에서만 보인다
+  useEffect(() => {
+    if (!router.isReady) return;
+    if (router.query.operator === '1') setOperator(true);
+    if (router.query.operator === '0') setOperator(false);
+    setOperatorState(isOperator());
+  }, [router.isReady, router.query.operator]);
+
+  const handleDelete = async () => {
+    if (
+      !window.confirm(
+        '아이 정보, 찜, 예약 기록, 가 본 곳 표시가 모두 지워지고 되돌릴 수 없어요. 탈퇴할까요?'
+      )
+    )
+      return;
+    setDeleting(true);
+    try {
+      await deleteAccount();
+      logout();
+      router.push('/login');
+    } catch (error) {
+      console.error('탈퇴 실패:', error);
+      window.alert('탈퇴하지 못했어요. 인터넷 연결을 확인하고 다시 시도해 주세요.');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const set =
     <K extends keyof DisplaySettings>(key: K) =>
@@ -248,10 +280,50 @@ export default function SettingsPage() {
             >
               <FiLogOut size={20} /> 로그아웃
             </button>
+            {CLOUD_ENABLED && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="w-full px-4 py-3.5 text-left text-sm text-gray-500 hover:bg-gray-50 last:rounded-b-2xl disabled:opacity-50"
+              >
+                {deleting ? '지우는 중…' : '탈퇴하고 내 데이터 모두 지우기'}
+              </button>
+            )}
           </Section>
         )}
 
-        <p className="text-center text-xs text-gray-400 mt-8">
+        {operator && (
+          <Section title="운영자">
+            <Link
+              href="/dashboard#collect"
+              className="flex items-center gap-3 px-4 py-3.5 text-gray-900 hover:bg-gray-50 first:rounded-t-2xl"
+            >
+              <span className="flex-1 font-medium">데이터 수집 상태</span>
+              <FiChevronRight className="text-gray-400" />
+            </Link>
+            <button
+              type="button"
+              onClick={() => {
+                setOperator(false);
+                setOperatorState(false);
+              }}
+              className="w-full px-4 py-3.5 text-left text-sm text-gray-500 hover:bg-gray-50 last:rounded-b-2xl"
+            >
+              이 기기에서 운영자 도구 끄기
+            </button>
+          </Section>
+        )}
+
+        <div className="flex justify-center gap-4 text-xs text-gray-500 mt-8">
+          <Link href="/terms" className="hover:text-gray-900">
+            이용약관
+          </Link>
+          <Link href="/privacy" className="font-semibold hover:text-gray-900">
+            개인정보처리방침
+          </Link>
+        </div>
+        <p className="text-center text-xs text-gray-400 mt-2">
           WITHKIDS · 아이와 함께할 체험·축제 모아보기
         </p>
       </div>

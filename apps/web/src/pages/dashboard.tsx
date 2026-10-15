@@ -6,6 +6,7 @@ import { useBookmarkStore } from '@/store/bookmarkStore';
 import { apiClient } from '@/lib/api';
 import { MainLayout } from '@/components/layouts/MainLayout';
 import { CrawlStatusPanel } from '@/components/CrawlStatusPanel';
+import { isOperator } from '@/lib/operator';
 import { dDayLabel, daysFromToday, formatMonthDay, formatTime } from '@/lib/bookingDates';
 import { FiBookmark, FiClock, FiExternalLink, FiMapPin } from 'react-icons/fi';
 import { festivalsInMonth, loadMyPlaces, type MyPlaces } from '@/lib/placeGuide';
@@ -30,9 +31,11 @@ export default function DashboardPage() {
   const { user, isAuthenticated, isLoading } = useAuthStore();
   const { bookmarks, hydrate: hydrateBookmarks } = useBookmarkStore();
   const [myPlaces, setMyPlaces] = useState<MyPlaces | null>(null);
+  const [operator, setOperator] = useState(false);
 
   useEffect(() => {
     setMyPlaces(loadMyPlaces());
+    setOperator(isOperator());
   }, []);
 
   const [schedule, setSchedule] = useState<ScheduleRun[]>([]);
@@ -116,7 +119,7 @@ export default function DashboardPage() {
             <p className="text-gray-600 py-8 text-center text-sm">
               지금 확인된 접수 일정이 없어요.
               <br />
-              아래에서 수집을 돌리면 새 프로그램이 여기에 표시됩니다.
+              매일 아침 새 프로그램을 확인해서 여기에 보여 드려요.
             </p>
           ) : (
             <ul className="divide-y divide-gray-100">
@@ -126,7 +129,15 @@ export default function DashboardPage() {
             </ul>
           )}
 
-          <CrawlStatusPanel onCompleted={load} />
+          {operator ? (
+            <div id="collect">
+              <CrawlStatusPanel onCompleted={load} />
+            </div>
+          ) : (
+            <p className="text-xs text-gray-400 mt-4">
+              서울시 공공서비스예약 정보 · 매일 아침 6시에 새로 모아요
+            </p>
+          )}
         </section>
       </div>
     </MainLayout>
