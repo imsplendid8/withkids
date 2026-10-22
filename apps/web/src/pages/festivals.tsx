@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import { FiExternalLink, FiMapPin, FiSearch, FiCalendar, FiAlertCircle } from 'react-icons/fi';
+import { SOURCES, SourceNote } from '@/components/SourceNote';
 import { MainLayout } from '@/components/layouts/MainLayout';
 import { ProgramImage } from '@/components/ProgramInfo';
 import { useAuthStore } from '@/store/authStore';
@@ -226,6 +227,11 @@ export default function FestivalsPage() {
             )}
           </>
         )}
+        <SourceNote
+          sources={[SOURCES.seoulOpenData, SOURCES.tourApi]}
+          updatedAt={file?.generatedAt}
+          note="날짜·장소는 주최 측 안내에서 꼭 확인하세요"
+        />
       </div>
     </MainLayout>
   );

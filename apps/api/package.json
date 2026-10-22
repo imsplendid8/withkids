@@ -21,7 +21,8 @@
     "export:programs": "ts-node --project tsconfig.json scripts/export-programs.ts",
     "export:festivals": "ts-node --project tsconfig.json scripts/export-festivals.ts",
     "export:notices": "ts-node --project tsconfig.json scripts/export-notices.ts",
-    "export:paid": "ts-node --project tsconfig.json scripts/export-paid.ts"
+    "export:paid": "ts-node --project tsconfig.json scripts/export-paid.ts",
+    "check:collection": "ts-node --project tsconfig.json scripts/check-collection.ts"
   },
   "dependencies": {
     "@bull-board/express": "^9.10.0",

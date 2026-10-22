@@ -219,6 +219,11 @@ export function importLocalData(data: unknown): { bookings: number } {
 
 let programsPromise: Promise<ProgramsFile> | null = null;
 
+/** 프로그램 목록을 마지막으로 모은 시각 (화면 아래 출처 표시용) */
+export async function getProgramsUpdatedAt(): Promise<string | null> {
+  return (await loadPrograms()).generatedAt;
+}
+
 function loadPrograms(): Promise<ProgramsFile> {
   if (!programsPromise) {
     programsPromise = fetch(`${BASE_PATH}/data/programs.json`, { cache: 'no-cache' })
