@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { useAuthStore } from '@/store/authStore';
 import { useBookmarkStore } from '@/store/bookmarkStore';
 import { apiClient } from '@/lib/api';
+import { SOURCES, SourceNote } from '@/components/SourceNote';
 import { MainLayout } from '@/components/layouts/MainLayout';
 import { EligibilityBadges } from '@/components/EligibilityBadges';
 import {
@@ -12,6 +13,7 @@ import {
   type SeoulProgramFields,
 } from '@/components/ProgramInfo';
 import { STATIC_MODE } from '@/lib/staticMode';
+import { getProgramsUpdatedAt } from '@/lib/localApi';
 import { getChildren } from '@/lib/children';
 import type { Child, EligibilityFilter, ProgramEligibility } from '@/lib/eligibility';
 import Link from 'next/link';
@@ -78,6 +80,14 @@ export default function ExperiencesPage() {
   const [useDate, setUseDate] = useState<'' | 'today' | 'weekend'>('');
   const [sameDay, setSameDay] = useState<'' | 'online' | 'any'>('');
   const [excludeKidsCafe, setExcludeKidsCafe] = useState(false);
+  const [programsUpdatedAt, setProgramsUpdatedAt] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (STATIC_MODE)
+      getProgramsUpdatedAt()
+        .then(setProgramsUpdatedAt)
+        .catch(() => undefined);
+  }, []);
   const [areas, setAreas] = useState<Array<{ name: string; count: number }>>([]);
 
   const itemsPerPage = 12;
@@ -652,6 +662,11 @@ export default function ExperiencesPage() {
             </button>
           </div>
         )}
+        <SourceNote
+          sources={[SOURCES.seoulReservation]}
+          updatedAt={programsUpdatedAt}
+          note="신청은 서울시 공공서비스예약에서 해요"
+        />
       </div>
     </MainLayout>
   );

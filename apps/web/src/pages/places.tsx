@@ -28,6 +28,7 @@ import {
   FiX,
   FiZap,
 } from 'react-icons/fi';
+import { SourceNote } from '@/components/SourceNote';
 import { MainLayout } from '@/components/layouts/MainLayout';
 import { useAuthStore } from '@/store/authStore';
 import { defaultChildName, getChildren } from '@/lib/children';
@@ -287,6 +288,10 @@ export default function PlacesPage() {
 
         {tab === 'tours' && <ToursTab kids={kids} today={today} />}
         {tab === 'festivals' && <FestivalsTab today={today} />}
+        <SourceNote
+          sources={[]}
+          note="아이와 직접 다녀온 곳을 정리한 목록이에요 (2026년 10월). 운영 시간·요금·나이 조건은 방문 전에 꼭 확인하세요."
+        />
       </div>
 
       {open && (

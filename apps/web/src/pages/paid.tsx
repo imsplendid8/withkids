@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import { FiExternalLink, FiMapPin, FiSearch, FiStar, FiAlertCircle, FiUsers } from 'react-icons/fi';
+import { SOURCES, SourceNote } from '@/components/SourceNote';
 import { MainLayout } from '@/components/layouts/MainLayout';
 import { ProgramImage } from '@/components/ProgramInfo';
 import { useAuthStore } from '@/store/authStore';
@@ -349,6 +350,7 @@ export default function PaidPage() {
             </p>
           </>
         )}
+        <SourceNote sources={[SOURCES.nolbal, SOURCES.tourApi]} updatedAt={file?.generatedAt} />
       </div>
     </MainLayout>
   );
@@ -377,9 +379,7 @@ function Chip({
       onClick={onClick}
       aria-pressed={active}
       className={`px-3.5 py-1.5 rounded-full text-sm font-medium ${
-        active
-          ? 'bg-blue-600 text-white'
-          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+        active ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
       }`}
     >
       {children}

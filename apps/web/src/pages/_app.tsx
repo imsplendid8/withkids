@@ -6,6 +6,11 @@ import { apiClient } from '@/lib/api';
 import { initSentry, setUser, clearUser } from '@/lib/sentry';
 import { trackWebVitals } from '@/lib/performance';
 import { BASE_PATH } from '@/lib/staticMode';
+
+/** 미리보기 이미지는 전체 주소여야 해서 배포할 때 사이트 주소를 받는다 (없으면 경로만) */
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || BASE_PATH;
+const SHARE_DESCRIPTION =
+  '우리 아이 나이에 맞는 서울 공공 체험 접수 일정, 축제, 가볼 만한 곳을 한곳에서 봐요.';
 import { useDisplayStore, viewportContent } from '@/store/displayStore';
 import '../styles/globals.css';
 import '../styles/theme.css';
@@ -67,6 +72,18 @@ export default function App({ Component, pageProps }: AppProps) {
         <link rel="icon" href={`${BASE_PATH}/favicon-48.png`} type="image/png" sizes="48x48" />
         <link rel="apple-touch-icon" href={`${BASE_PATH}/apple-touch-icon.png`} />
         <link rel="manifest" href={`${BASE_PATH}/manifest.webmanifest`} />
+        {/* 카카오톡·문자로 주소를 보낼 때 보이는 미리보기 */}
+        <meta name="description" content={SHARE_DESCRIPTION} />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="WITHKIDS" />
+        <meta property="og:title" content="WITHKIDS" />
+        <meta property="og:description" content={SHARE_DESCRIPTION} />
+        <meta property="og:image" content={`${SITE_URL}/og.png`} />
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
+        <meta property="og:url" content={`${SITE_URL}/`} />
+        <meta property="og:locale" content="ko_KR" />
+        <meta name="twitter:card" content="summary_large_image" />
         <meta name="apple-mobile-web-app-title" content="WITHKIDS" />
       </Head>
       <Component {...pageProps} />
